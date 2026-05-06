@@ -155,7 +155,7 @@ jobs:
       - name: Lint podspecs
         run: |
           pod lib lint ios/BubblSDK.podspec --allow-warnings --verbose
-          pod lib lint ios/Bubbl-Sdk.podspec --allow-warnings --verbose
+          pod lib lint ios/Bubbl-Sdk.podspec --include-podspecs=ios/BubblSDK.podspec --allow-warnings --verbose
 
   cocoapods-publish:
     name: CocoaPods trunk
@@ -183,7 +183,7 @@ jobs:
         run: |
           pod trunk me
           pod trunk push ios/BubblSDK.podspec --allow-warnings --verbose
-          pod trunk push ios/Bubbl-Sdk.podspec --allow-warnings --verbose
+          pod trunk push ios/Bubbl-Sdk.podspec --synchronous --allow-warnings --verbose
 
   flutter-checks:
     name: Flutter checks
