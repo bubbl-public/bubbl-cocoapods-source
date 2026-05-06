@@ -22,5 +22,5 @@ current Transmission v2 wire distance unit before calling `/api/check-geofence`.
 Release packaging:
 
 - Swift Package is the primary integration path.
-- `BubblSDK.podspec` provides transitional CocoaPods compatibility.
+- `BubblSDK.podspec` provides transitional CocoaPods compatibility for private specs repos.
 - `../scripts/build-ios-xcframework.sh` builds `ios/build/Bubbl.xcframework` from the Swift package.

@@ -72,6 +72,16 @@ if (exists('.github/workflows/sdk-release.yml')) {
   for (const expected of ['publishAndReleaseToMavenCentral', 'dart-lang/setup-dart/.github/workflows/publish.yml@v1', 'pod trunk push', 'npm publish']) {
     check(`workflow.${expected}`, workflow.includes(expected), `Release workflow must include ${expected}.`);
   }
+  check(
+    'workflow.private-registry-gate',
+    workflow.includes('BUBBL_PUBLIC_REGISTRY_RELEASE') && workflow.includes("needs.validate.outputs.public_registry_release == 'true'"),
+    'Public registry publish jobs must be gated behind BUBBL_PUBLIC_REGISTRY_RELEASE.',
+  );
+  check(
+    'workflow.cocoapods-private-safe',
+    workflow.includes('BUBBL_COCOAPODS_TRUNK_RELEASE') && workflow.includes('github.event.repository.private'),
+    'CocoaPods trunk publish must be separately gated and disabled for private repositories.',
+  );
 }
 
 console.log('# Bubbl SDK Release Config');

@@ -18,6 +18,8 @@ env:
   JAVA_VERSION: '17'
   GRADLE_VERSION: '8.5'
   DRY_RUN: ${{ github.event_name != 'push' }}
+  BUBBL_PUBLIC_REGISTRY_RELEASE: ${{ vars.BUBBL_PUBLIC_REGISTRY_RELEASE || 'false' }}
+  BUBBL_COCOAPODS_TRUNK_RELEASE: ${{ vars.BUBBL_COCOAPODS_TRUNK_RELEASE || 'false' }}
 
 jobs:
   validate:
@@ -25,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      public_registry_release: ${{ steps.mode.outputs.public_registry_release }}
+      cocoapods_trunk_release: ${{ steps.mode.outputs.cocoapods_trunk_release }}
     steps:
       - uses: actions/checkout@v4
 
@@ -42,6 +46,29 @@ jobs:
             echo "Release tag '${GITHUB_REF_NAME}' must exactly match package version '${VERSION}'."
             exit 1
           fi
+
+      - id: mode
+        shell: bash
+        env:
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          PUBLIC_REGISTRY_RELEASE=false
+          COCOAPODS_TRUNK_RELEASE=false
+
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${BUBBL_PUBLIC_REGISTRY_RELEASE}" = "true" ]; then
+            PUBLIC_REGISTRY_RELEASE=true
+          fi
+
+          if [ "${PUBLIC_REGISTRY_RELEASE}" = "true" ] && \
+             [ "${BUBBL_COCOAPODS_TRUNK_RELEASE}" = "true" ] && \
+             [ "${REPOSITORY_PRIVATE}" != "true" ]; then
+            COCOAPODS_TRUNK_RELEASE=true
+          fi
+
+          echo "public_registry_release=${PUBLIC_REGISTRY_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "cocoapods_trunk_release=${COCOAPODS_TRUNK_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "Public registry release: ${PUBLIC_REGISTRY_RELEASE}"
+          echo "CocoaPods trunk release: ${COCOAPODS_TRUNK_RELEASE}"
 
       - run: npm run test:contracts
       - run: npm run test:wrappers
@@ -75,7 +102,7 @@ jobs:
     needs:
       - validate
       - android-checks
-    if: github.event_name == 'push'
+    if: needs.validate.outputs.public_registry_release == 'true'
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
@@ -162,7 +189,7 @@ jobs:
     needs:
       - validate
       - cocoapods-lint
-    if: github.event_name == 'push'
+    if: needs.validate.outputs.cocoapods_trunk_release == 'true'
     runs-on: macos-15
     environment: cocoapods-release
     steps:
@@ -208,10 +235,8 @@ jobs:
     name: Flutter pub.dev
     needs:
       - validate
-      - android-publish
-      - cocoapods-publish
       - flutter-checks
-    if: github.event_name == 'push'
+    if: needs.validate.outputs.public_registry_release == 'true'
     permissions:
       contents: read
       id-token: write
@@ -243,7 +268,7 @@ jobs:
     needs:
       - validate
       - react-native-pack
-    if: github.event_name == 'push'
+    if: needs.validate.outputs.public_registry_release == 'true'
     runs-on: ubuntu-latest
     environment: npm-release
     permissions:

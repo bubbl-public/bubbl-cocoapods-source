@@ -58,6 +58,6 @@ This is the beta candidate foundation:
 - `examples/ios-canary` proves the local iOS Swift Package inside a simulator app runtime.
 - [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md) defines notifications as a core runtime priority: the shipped SDK should bundle Firebase integration, trigger native device notifications, and provide default popup/survey UI with customization hooks.
 - [LEGACY_PARITY.md](LEGACY_PARITY.md) tracks the old SDK geofence, background, Firebase, notification, and host-callback behavior still needed before v3 can replace current native SDKs.
-- [RELEASE.md](RELEASE.md) defines the monorepo release setup that publishes v3 into the existing Maven Central, CocoaPods, pub.dev, and npm package spaces.
+- [RELEASE.md](RELEASE.md) defines the private-source monorepo release setup. Tag builds always validate and create artifacts; public registry publishing is an explicit opt-in.
 - Flutter now bridges the Dart facade to native Android/iOS SDK cores through platform channels. React Native now bridges the JS facade to native Android/iOS SDK cores through autolinked native modules, with the TurboModule spec kept in place for codegen.
 - `npm run test:contracts` validates the contract pack without external dependencies.

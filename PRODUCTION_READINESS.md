@@ -53,7 +53,7 @@ Must be true before `3.0.0`:
 | Flutter | Beta-ready | Android/iOS platform-channel bridge, host-app canaries, wrapper tests, and `pub publish --dry-run` pass. Still needs deeper event/serialization parity and staging-device proof before RC. |
 | React Native | Beta-ready | Autolinked Android/iOS native modules call the native SDK cores, the TurboModule spec is present, wrapper validation covers both native sides, and npm package dry-run validation is available. Still needs generated TurboModule host canaries and staging-device proof before RC. |
 | Android release | Configured | Maven Central Portal publishing now reuses `tech.bubbl.sdk:bubbl-sdk`. Still needs migrated secrets and a tag publish dry-run/proof from GitHub. |
-| iOS release | Configured | SPM, `BubblSDK`, legacy `Bubbl-Sdk`, and XCFramework artifact flow are wired. Still needs trunk token migration and tag publish proof. |
+| iOS release | Configured | SPM, `BubblSDK`, legacy `Bubbl-Sdk`, and XCFramework artifact flow are wired. Private repo distribution should use SPM or a private CocoaPods specs repo; public trunk is intentionally gated off for the private monorepo. |
 | CI | Configured | CI and release workflows now run strict readiness plus registry configuration checks. Still needs the new monorepo to be pushed to GitHub with secrets/environments configured. |
 | Notifications | Partially ready | Android rich image notifications, iOS media attachments, CTA action routing, default UI, and notification telemetry exist. Still needs durable cross-source frequency gates, permission helpers, and polished customization hooks. |
 | Location | Needs hardening | Add foreground/background lifecycle switching, permission helpers, live movement canary evidence, and map overlay snapshots. |
