@@ -1,0 +1,21 @@
+{
+  "name": "@bubbl-tech/renewed-sdk",
+  "version": "3.0.0-beta.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npm run test:contracts",
+    "test:contracts": "node scripts/validate-contracts.mjs",
+    "test:wrappers": "node scripts/validate-wrapper-surfaces.mjs",
+    "test:rn": "node scripts/validate-wrapper-surfaces.mjs --react-native",
+    "test:android": "sh scripts/run-android-tests.sh",
+    "test:ios": "swift test --package-path ios --scratch-path /tmp/bubbl-renewed-sdk-ios-build",
+    "test:flutter": "cd flutter && flutter pub get && flutter analyze && flutter test",
+    "test:flutter-wrapper": "sh scripts/run-flutter-wrapper-canary.sh",
+    "test:ios-canary": "examples/ios-canary/run-canary.sh",
+    "test:local": "npm run test:contracts && npm run test:wrappers && npm run test:rn && npm run test:android && npm run test:ios && npm run test:flutter",
+    "readiness": "node scripts/validate-production-readiness.mjs",
+    "readiness:strict": "node scripts/validate-production-readiness.mjs --strict",
+    "release:check": "node scripts/validate-release-config.mjs"
+  }
+}

@@ -1,0 +1,46 @@
+plugins {
+    id "com.android.library"
+    id "org.jetbrains.kotlin.android"
+}
+
+group = "tech.bubbl.reactnative"
+version = "3.0.0-beta.1"
+
+def isNewArchitectureEnabled() {
+    project.hasProperty("newArchEnabled") && project.newArchEnabled == "true"
+}
+
+if (isNewArchitectureEnabled()) {
+    apply plugin: "com.facebook.react"
+}
+
+def safeExtGet(prop, fallback) {
+    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+
+def reactNativeVersion = safeExtGet("reactNativeVersion", "0.76.9")
+
+android {
+    namespace = "tech.bubbl.reactnative"
+    compileSdk = safeExtGet("compileSdkVersion", 35)
+
+    defaultConfig {
+        minSdk = safeExtGet("minSdkVersion", 27)
+        buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+dependencies {
+    implementation "com.facebook.react:react-android:${reactNativeVersion}"
+    implementation "tech.bubbl.sdk:bubbl-sdk:3.0.0-beta.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
+}

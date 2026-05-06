@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.bubbl.tech/sdk/v3/survey-response.schema.json",
+  "title": "SurveyResponse",
+  "type": "object",
+  "required": ["device_registered_id", "activity", "curated_notification_id"],
+  "properties": {
+    "device_registered_id": { "type": "string" },
+    "location_id": {
+      "oneOf": [
+        { "type": "integer" },
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "activity": {
+      "type": "string",
+      "enum": [
+        "cta_engagement",
+        "notification_sent",
+        "notification_delivered",
+        "dismissed",
+        "survey_activity",
+        "survey_submit"
+      ]
+    },
+    "curated_notification_id": {
+      "oneOf": [
+        { "type": "integer" },
+        { "type": "string" }
+      ]
+    },
+    "responses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["question_id", "type"],
+        "properties": {
+          "question_id": {
+            "oneOf": [
+              { "type": "integer" },
+              { "type": "string" }
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SINGLE_CHOICE",
+              "MULTIPLE_CHOICE",
+              "BOOLEAN",
+              "SLIDER",
+              "RATING",
+              "NUMBER",
+              "OPEN_ENDED"
+            ]
+          },
+          "value": {},
+          "choice": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["choice_id"],
+              "properties": {
+                "choice_id": {
+                  "oneOf": [
+                    { "type": "integer" },
+                    { "type": "string" }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "time": { "type": "string" }
+  },
+  "additionalProperties": false
+}

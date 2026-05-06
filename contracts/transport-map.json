@@ -1,0 +1,101 @@
+{
+  "contractVersion": "3.0.0-beta.1",
+  "environments": {
+    "development": {
+      "runtimeBaseUrl": "https://nightly.api.bubbl.tech",
+      "ingestBaseUrl": "https://nightly-platform.bubbl.tech",
+      "legacyAlias": "nightly"
+    },
+    "nightly": {
+      "runtimeBaseUrl": "https://nightly.api.bubbl.tech",
+      "ingestBaseUrl": "https://nightly-platform.bubbl.tech"
+    },
+    "staging": {
+      "runtimeBaseUrl": "https://staging.api.bubbl.tech",
+      "ingestBaseUrl": "https://staging-platform.bubbl.tech"
+    },
+    "production": {
+      "runtimeBaseUrl": "https://production.api.bubbl.tech",
+      "ingestBaseUrl": "https://platform.bubbl.tech"
+    }
+  },
+  "runtime": {
+    "refreshGeofence": {
+      "method": "POST",
+      "path": "/api/check-geofence",
+      "authHeader": "x-api-key",
+      "owner": "transmission",
+      "publicDistanceUnit": "meters",
+      "wireDistanceUnit": "miles",
+      "wireShape": "legacy-transmission-v2"
+    },
+    "refreshPush": {
+      "method": "GET",
+      "path": "/api/check-push",
+      "authHeader": "x-api-key",
+      "owner": "transmission"
+    },
+    "getConfiguration": {
+      "method": "GET",
+      "path": "/api/get-config",
+      "authHeader": "x-api-key",
+      "owner": "transmission"
+    }
+  },
+  "ingest": {
+    "registerDevice": {
+      "method": "POST",
+      "path": "/api/device-registerd/create",
+      "authHeader": "ApiKey",
+      "owner": "dashboard",
+      "wireShape": "legacy-mirrored"
+    },
+    "bootBatch": {
+      "method": "POST",
+      "path": "/api/device-data",
+      "authHeader": "ApiKey",
+      "owner": "dashboard",
+      "wireShape": "legacy-mirrored"
+    },
+    "trackEvent": {
+      "method": "POST",
+      "path": "/api/activities",
+      "authHeader": "ApiKey",
+      "owner": "dashboard",
+      "wireShape": "legacy-mirrored"
+    },
+    "updateSegments": {
+      "method": "POST",
+      "path": "/api/segments",
+      "authHeader": "ApiKey",
+      "owner": "dashboard",
+      "wireShape": "legacy-mirrored"
+    },
+    "submitSurveyResponse": {
+      "method": "POST",
+      "path": "/api/survey-response",
+      "authHeader": "ApiKey",
+      "owner": "dashboard",
+      "wireShape": "legacy-mirrored"
+    },
+    "trackGeofenceBatch": {
+      "method": "POST",
+      "path": "/api/geofence-data",
+      "authHeader": "ApiKey",
+      "owner": "dashboard",
+      "wireShape": "legacy-mirrored"
+    }
+  },
+  "headers": {
+    "diagnostic": [
+      "X-Bubbl-SDK-Version",
+      "X-Bubbl-SDK-Platform",
+      "X-Bubbl-Request-ID",
+      "X-Bubbl-Install-ID"
+    ],
+    "idempotency": [
+      "Idempotency-Key",
+      "X-Idempotency-Key"
+    ]
+  }
+}

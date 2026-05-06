@@ -1,0 +1,17 @@
+{
+  "app_name": "Host App",
+  "api_key": "company-api-key",
+  "sdk_version": "3.0.0-beta.1",
+  "platform": "ios",
+  "os_version": "18.0",
+  "device_model": "iPhone",
+  "device_name": "Jack iPhone",
+  "manufacturer": "Apple",
+  "country": "GB",
+  "language": "en",
+  "device_id": "stable-device-id",
+  "segmentations": ["vip", "beta"],
+  "correlation_id": "host-user-123",
+  "bubbl_id": "sdk-generated-install-id",
+  "device_token": "apns-or-fcm-token"
+}

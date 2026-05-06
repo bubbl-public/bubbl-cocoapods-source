@@ -1,0 +1,445 @@
+openapi: 3.1.0
+info:
+  title: Bubbl SDK v3 Contract
+  version: 3.0.0-beta.1
+  description: >
+    SDK v3 public concepts mapped to the current Transmission runtime paths and
+    renewed Dashboard legacy-mirrored ingest paths.
+servers:
+  - url: https://nightly.api.bubbl.tech
+    description: Transmission nightly runtime
+  - url: https://staging.api.bubbl.tech
+    description: Transmission staging runtime
+  - url: https://production.api.bubbl.tech
+    description: Transmission production runtime
+  - url: https://nightly-platform.bubbl.tech
+    description: Dashboard nightly ingest
+  - url: https://staging-platform.bubbl.tech
+    description: Dashboard staging ingest
+  - url: https://platform.bubbl.tech
+    description: Dashboard production ingest
+security:
+  - RuntimeApiKey: []
+  - DashboardApiKey: []
+paths:
+  /api/check-geofence:
+    post:
+      operationId: refreshGeofence
+      x-bubbl-sdk-method: refreshGeofence
+      x-bubbl-public-distance-unit: meters
+      x-bubbl-wire-distance-unit: miles
+      x-bubbl-wire-shape: legacy-transmission-v2
+      security:
+        - RuntimeApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/SdkVersion"
+        - $ref: "#/components/parameters/SdkPlatform"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/InstallId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuntimeGeofenceRequest"
+      responses:
+        "200":
+          description: Legacy-compatible runtime geofence response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuntimeGeofenceResponse"
+  /api/check-push:
+    get:
+      operationId: refreshPush
+      x-bubbl-sdk-method: refreshPush
+      security:
+        - RuntimeApiKey: []
+      responses:
+        "200":
+          description: Legacy-compatible push response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuntimePushResponse"
+  /api/get-config:
+    get:
+      operationId: getConfiguration
+      x-bubbl-sdk-method: getConfiguration
+      security:
+        - RuntimeApiKey: []
+      responses:
+        "200":
+          description: Runtime configuration response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuntimeConfigResponse"
+  /api/device-registerd/create:
+    post:
+      operationId: registerDevice
+      x-bubbl-sdk-method: registerPushToken
+      x-bubbl-wire-shape: legacy-mirrored
+      security:
+        - DashboardApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/SdkVersion"
+        - $ref: "#/components/parameters/SdkPlatform"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/InstallId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceRegistration"
+      responses:
+        "200":
+          description: Queued or accepted device registration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedResponse"
+  /api/device-data:
+    post:
+      operationId: bootBatch
+      x-bubbl-sdk-method: boot
+      x-bubbl-wire-shape: legacy-mirrored
+      security:
+        - DashboardApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/SdkVersion"
+        - $ref: "#/components/parameters/SdkPlatform"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/InstallId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceDataBatch"
+      responses:
+        "200":
+          description: Queued or accepted boot-time device data batch.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedResponse"
+  /api/geofence-data:
+    post:
+      operationId: trackGeofenceBatch
+      x-bubbl-sdk-method: refreshGeofence
+      x-bubbl-wire-shape: legacy-mirrored
+      security:
+        - DashboardApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/SdkVersion"
+        - $ref: "#/components/parameters/SdkPlatform"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/InstallId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GeofenceDataBatch"
+      responses:
+        "200":
+          description: Queued or accepted geofence/location/notification batch.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedResponse"
+  /api/activities:
+    post:
+      operationId: trackEvent
+      x-bubbl-sdk-method: track
+      x-bubbl-wire-shape: legacy-mirrored
+      security:
+        - DashboardApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/SdkVersion"
+        - $ref: "#/components/parameters/SdkPlatform"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/InstallId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestEvent"
+      responses:
+        "200":
+          description: Queued or accepted event.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedResponse"
+  /api/segments:
+    post:
+      operationId: updateSegments
+      x-bubbl-sdk-method: updateSegments
+      x-bubbl-wire-shape: legacy-mirrored
+      security:
+        - DashboardApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/SdkVersion"
+        - $ref: "#/components/parameters/SdkPlatform"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/InstallId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SegmentsUpdate"
+      responses:
+        "200":
+          description: Queued or accepted segmentation update.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedResponse"
+  /api/survey-response:
+    post:
+      operationId: submitSurveyResponse
+      x-bubbl-sdk-method: submitSurveyResponse
+      x-bubbl-wire-shape: legacy-mirrored
+      security:
+        - DashboardApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/SdkVersion"
+        - $ref: "#/components/parameters/SdkPlatform"
+        - $ref: "#/components/parameters/RequestId"
+        - $ref: "#/components/parameters/InstallId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SurveyResponse"
+      responses:
+        "200":
+          description: Queued survey event.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueuedResponse"
+components:
+  securitySchemes:
+    RuntimeApiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+    DashboardApiKey:
+      type: apiKey
+      in: header
+      name: ApiKey
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 191
+    SdkVersion:
+      name: X-Bubbl-SDK-Version
+      in: header
+      required: false
+      schema:
+        type: string
+    SdkPlatform:
+      name: X-Bubbl-SDK-Platform
+      in: header
+      required: false
+      schema:
+        type: string
+        enum: [android, ios, flutter, react-native]
+    RequestId:
+      name: X-Bubbl-Request-ID
+      in: header
+      required: false
+      schema:
+        type: string
+    InstallId:
+      name: X-Bubbl-Install-ID
+      in: header
+      required: false
+      schema:
+        type: string
+  schemas:
+    RuntimeGeofenceRequest:
+      type: object
+      required: [latitude, longitude, distance]
+      properties:
+        latitude:
+          type: string
+        longitude:
+          type: string
+        distance:
+          type: number
+          exclusiveMinimum: 0
+          description: >
+            Legacy Transmission v2 wire distance in miles. SDK public
+            configuration remains meters and native clients convert before
+            sending this request.
+        segmentationTags:
+          type: string
+    RuntimeGeofenceResponse:
+      type: object
+      required: [geoCampaign, pushCampaign, configuration]
+      properties:
+        geoCampaign:
+          type: array
+          items:
+            $ref: "#/components/schemas/Campaign"
+        pushCampaign:
+          type: array
+          items:
+            $ref: "#/components/schemas/Campaign"
+        configuration:
+          $ref: "#/components/schemas/Configuration"
+    RuntimePushResponse:
+      type: object
+      required: [pushCampaign, configuration]
+      properties:
+        pushCampaign:
+          type: array
+          items:
+            $ref: "#/components/schemas/Campaign"
+        configuration:
+          $ref: "#/components/schemas/Configuration"
+    RuntimeConfigResponse:
+      type: object
+      required: [configuration]
+      properties:
+        configuration:
+          $ref: "#/components/schemas/Configuration"
+    Configuration:
+      type: object
+      required: [notificationsCount, daysCount, batteryCount, privacyText]
+      properties:
+        notificationsCount:
+          type: integer
+        daysCount:
+          type: integer
+        batteryCount:
+          type: integer
+        privacyText:
+          type: string
+        frequencyDefaults:
+          $ref: "#/components/schemas/DeliveryPolicyFrequency"
+    Campaign:
+      type: object
+      additionalProperties: true
+      required: [campaignId, campaignName, type, active]
+      properties:
+        campaignId:
+          type: integer
+        campaignName:
+          type: string
+        type:
+          type: string
+        active:
+          oneOf:
+            - type: string
+            - type: boolean
+        segmentationTags:
+          type: string
+        coolingPeriodSeconds:
+          type: integer
+          nullable: true
+        maximumTriggers:
+          type: integer
+          nullable: true
+        ctaSuspend:
+          type: boolean
+          nullable: true
+        locationsArray:
+          type: object
+          additionalProperties: true
+        notificationsArray:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationContent"
+    NotificationContent:
+      type: object
+      additionalProperties: true
+      required: [curatedNotificationId, headline, body, type]
+      properties:
+        curatedNotificationId:
+          type: integer
+        headline:
+          type: string
+        body:
+          type: string
+        type:
+          type: string
+        activation:
+          type: string
+        deliveryPolicy:
+          $ref: "#/components/schemas/DeliveryPolicy"
+        coolingPeriodSeconds:
+          type: integer
+        maximumTriggers:
+          type: integer
+        ctaSuspend:
+          type: boolean
+        questions:
+          type: array
+    DeliveryPolicy:
+      allOf:
+        - $ref: "#/components/schemas/DeliveryPolicyFrequency"
+        - type: object
+          required: [activation]
+          properties:
+            activation:
+              type: string
+              enum: [ON_ENTER, ON_EXIT]
+    DeliveryPolicyFrequency:
+      type: object
+      required: [coolingPeriodSeconds, maximumTriggers, ctaSuspend]
+      properties:
+        coolingPeriodSeconds:
+          type: integer
+          minimum: 0
+        maximumTriggers:
+          type: integer
+          minimum: 0
+        ctaSuspend:
+          type: boolean
+    DeviceRegistration:
+      $ref: "./schemas/device-registration.schema.json"
+    DeviceDataBatch:
+      $ref: "./schemas/device-data.schema.json"
+    GeofenceDataBatch:
+      $ref: "./schemas/geofence-data.schema.json"
+    IngestEvent:
+      $ref: "./schemas/ingest-event.schema.json"
+    SegmentsUpdate:
+      $ref: "./schemas/segments-update.schema.json"
+    SurveyResponse:
+      $ref: "./schemas/survey-response.schema.json"
+    QueuedResponse:
+      type: object
+      required: [success, queued, data]
+      properties:
+        success:
+          type: boolean
+        queued:
+          type: boolean
+        data:
+          type: object
+          required: [ingest_message_id, status]
+          properties:
+            ingest_message_id:
+              type: string
+            status:
+              type: string

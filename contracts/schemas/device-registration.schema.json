@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.bubbl.tech/sdk/v3/device-registration.schema.json",
+  "title": "DeviceRegistration",
+  "type": "object",
+  "required": [
+    "app_name",
+    "api_key",
+    "sdk_version",
+    "platform",
+    "os_version",
+    "device_model",
+    "device_name",
+    "manufacturer",
+    "country",
+    "language",
+    "device_id",
+    "bubbl_id"
+  ],
+  "properties": {
+    "app_name": { "type": "string" },
+    "api_key": { "type": "string" },
+    "sdk_version": { "type": "string" },
+    "platform": { "type": "string" },
+    "os_version": { "type": "string" },
+    "device_model": { "type": "string" },
+    "device_name": { "type": "string" },
+    "manufacturer": { "type": "string" },
+    "country": { "type": "string" },
+    "language": { "type": "string" },
+    "device_id": { "type": "string" },
+    "segmentations": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      ]
+    },
+    "correlation_id": { "type": "string" },
+    "bubbl_id": { "type": "string" },
+    "device_token": { "type": "string" }
+  },
+  "additionalProperties": false
+}

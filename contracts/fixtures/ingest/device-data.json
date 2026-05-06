@@ -1,0 +1,31 @@
+{
+  "device_registered": {
+    "app_name": "Bubbl Canary",
+    "api_key": "sdk_fixture_key",
+    "sdk_version": "3.0.0-beta.1",
+    "platform": "ios",
+    "os_version": "17.4",
+    "device_model": "iPhone 15",
+    "device_name": "Canary iPhone",
+    "manufacturer": "Apple",
+    "country": "GB",
+    "language": "en",
+    "device_id": "fixture-device-1",
+    "segmentations": ["stadium", "metro"],
+    "correlation_id": "fixture-correlation-1",
+    "bubbl_id": "fixture-bubbl-1",
+    "device_token": "fixture-push-token-1"
+  },
+  "plugin_activity": {
+    "device_registered_id": "fixture-device-1",
+    "time": "2026-05-05T10:00:00Z",
+    "activity": "plugin_opened"
+  },
+  "raw_data": {
+    "event": "boot",
+    "request": {
+      "source": "sdk-v3",
+      "offline": false
+    }
+  }
+}

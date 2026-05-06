@@ -1,0 +1,69 @@
+{
+  "geoCampaign": [
+    {
+      "campaignId": 123,
+      "campaignName": "Spring offers",
+      "type": "GEO",
+      "locations": [10],
+      "active": "true",
+      "segmentationTags": "vip,retail",
+      "testIds": "",
+      "coolingPeriodSeconds": 3600,
+      "maximumTriggers": 3,
+      "ctaSuspend": false,
+      "locationsArray": {
+        "locationId": 10,
+        "geofence": [
+          { "position": 1, "latitude": "51.501476", "longitude": "-0.140112" },
+          { "position": 2, "latitude": "51.501800", "longitude": "-0.141000" },
+          { "position": 3, "latitude": "51.501476", "longitude": "-0.142000" }
+        ]
+      },
+      "notificationsArray": [
+        {
+          "id": 456,
+          "curatedNotificationId": 456,
+          "campaignId": [123],
+          "campaignIdPrimary": 123,
+          "locationId": "10",
+          "headline": "Welcome",
+          "body": "Thanks for visiting",
+          "type": "notification",
+          "media": [],
+          "mediaType": null,
+          "mediaUrl": null,
+          "questions": [],
+          "cta": [],
+          "ctaLabel": "Open",
+          "ctaUrl": "https://bubbl.tech",
+          "postMessage": "",
+          "activation": "ON_ENTER",
+          "deliveryPolicy": {
+            "activation": "ON_ENTER",
+            "coolingPeriodSeconds": 3600,
+            "maximumTriggers": 3,
+            "ctaSuspend": false
+          },
+          "published": true,
+          "start": "2026-05-04T00:00:00Z",
+          "end": "2026-05-31T23:59:59Z",
+          "coolingPeriodSeconds": 3600,
+          "maximumTriggers": 3,
+          "ctaSuspend": false
+        }
+      ]
+    }
+  ],
+  "pushCampaign": [],
+  "configuration": {
+    "notificationsCount": 10,
+    "daysCount": 1,
+    "batteryCount": 10,
+    "privacyText": "We respect your privacy",
+    "frequencyDefaults": {
+      "coolingPeriodSeconds": 259200,
+      "maximumTriggers": 5,
+      "ctaSuspend": false
+    }
+  }
+}

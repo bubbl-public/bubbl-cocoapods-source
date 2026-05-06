@@ -1,0 +1,48 @@
+{
+  "name": "@bubbl-tech/react-native-sdk",
+  "version": "3.0.0-beta.1",
+  "description": "React Native wrapper for Bubbl SDK v3 native Android and iOS cores.",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "react-native": "src/index.ts",
+  "source": "src/index.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bubbl-repo/renewed-sdk.git",
+    "directory": "react-native"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../scripts/validate-wrapper-surfaces.mjs --react-native",
+    "test": "node ../scripts/validate-wrapper-surfaces.mjs --react-native",
+    "typecheck": "node ../scripts/validate-wrapper-surfaces.mjs --react-native"
+  },
+  "files": [
+    "android/build.gradle",
+    "android/src",
+    "ios/BubblSdk.swift",
+    "ios/BubblSdkBridge.m",
+    "src",
+    "BubblReactNativeSdk.podspec",
+    "react-native.config.js",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "react": "*",
+    "react-native": ">=0.76"
+  },
+  "codegenConfig": {
+    "name": "BubblSdkSpec",
+    "type": "modules",
+    "jsSrcsDir": "src/specs",
+    "android": {
+      "javaPackageName": "tech.bubbl.reactnative"
+    }
+  }
+}

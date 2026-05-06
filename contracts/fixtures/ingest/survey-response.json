@@ -1,0 +1,20 @@
+{
+  "device_registered_id": "stable-device-id",
+  "location_id": 10,
+  "activity": "survey_submit",
+  "curated_notification_id": 456,
+  "responses": [
+    {
+      "question_id": 1,
+      "type": "SINGLE_CHOICE",
+      "value": "Great",
+      "choice": [{ "choice_id": 7 }]
+    },
+    {
+      "question_id": 2,
+      "type": "OPEN_ENDED",
+      "value": "Loved it",
+      "choice": []
+    }
+  ]
+}

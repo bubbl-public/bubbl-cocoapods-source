@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bubbl Legacy-Mirrored Device Data Batch",
+  "type": "object",
+  "required": ["device_registered", "plugin_activity", "raw_data"],
+  "additionalProperties": true,
+  "properties": {
+    "device_registered": {
+      "$ref": "./device-registration.schema.json"
+    },
+    "plugin_activity": {
+      "type": "object",
+      "required": ["device_registered_id", "time", "activity"],
+      "additionalProperties": true,
+      "properties": {
+        "device_registered_id": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        },
+        "activity": {
+          "type": "string"
+        }
+      }
+    },
+    "raw_data": {
+      "type": "object",
+      "required": ["event", "request"],
+      "additionalProperties": true,
+      "properties": {
+        "event": {
+          "type": ["string", "number", "boolean"]
+        },
+        "request": {
+          "type": ["object", "array", "string"]
+        }
+      }
+    }
+  }
+}

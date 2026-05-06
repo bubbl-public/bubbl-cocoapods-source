@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bubbl Legacy-Mirrored Geofence Data Batch",
+  "type": "object",
+  "required": ["geo", "location", "notification"],
+  "additionalProperties": true,
+  "properties": {
+    "geo": {
+      "$ref": "#/$defs/geofenceActivity"
+    },
+    "location": {
+      "$ref": "#/$defs/locationUpdate"
+    },
+    "notification": {
+      "$ref": "#/$defs/notificationActivity"
+    }
+  },
+  "$defs": {
+    "geofenceActivity": {
+      "type": "object",
+      "required": ["location_id", "device_registered_id", "time", "activity", "latitude", "longitude"],
+      "additionalProperties": true,
+      "properties": {
+        "location_id": {
+          "type": "integer"
+        },
+        "device_registered_id": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        },
+        "activity": {
+          "type": "string",
+          "enum": ["geofence_entry", "geofence_exit"]
+        },
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        }
+      }
+    },
+    "locationUpdate": {
+      "type": "object",
+      "required": ["device_registered_id", "time", "activity", "latitude", "longitude"],
+      "additionalProperties": true,
+      "properties": {
+        "device_registered_id": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        },
+        "activity": {
+          "type": "string",
+          "enum": ["location_update"]
+        },
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        }
+      }
+    },
+    "notificationActivity": {
+      "type": "object",
+      "required": ["device_registered_id", "time", "activity", "curated_notification_id", "allow"],
+      "additionalProperties": true,
+      "properties": {
+        "device_registered_id": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        },
+        "activity": {
+          "type": "string"
+        },
+        "curated_notification_id": {
+          "type": "integer"
+        },
+        "allow": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

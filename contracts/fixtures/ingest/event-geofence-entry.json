@@ -1,0 +1,10 @@
+{
+  "device_registered_id": "stable-device-id",
+  "curated_notification_id": 456,
+  "location_id": 10,
+  "type": "geofence",
+  "activity": "geofence_entry",
+  "time": "2026-05-04T12:00:00Z",
+  "latitude": 53.483959,
+  "longitude": -2.244644
+}

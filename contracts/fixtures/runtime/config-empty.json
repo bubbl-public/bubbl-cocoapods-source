@@ -1,0 +1,8 @@
+{
+  "configuration": {
+    "notificationsCount": 10,
+    "daysCount": 1,
+    "batteryCount": 10,
+    "privacyText": "We respect your privacy"
+  }
+}

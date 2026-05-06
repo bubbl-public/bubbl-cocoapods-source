@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.bubbl.tech/sdk/v3/ingest-event.schema.json",
+  "title": "IngestEvent",
+  "type": "object",
+  "required": ["device_registered_id", "type"],
+  "properties": {
+    "device_registered_id": { "type": "string" },
+    "curated_notification_id": {
+      "oneOf": [
+        { "type": "integer" },
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "location_id": {
+      "oneOf": [
+        { "type": "integer" },
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "type": {
+      "type": "string",
+      "enum": ["plugin", "notification", "geofence", "media", "location"]
+    },
+    "activity": {
+      "type": "string",
+      "enum": [
+        "cta_engagment",
+        "cta_engagement",
+        "notification_sent",
+        "notification_delivered",
+        "media_viewed",
+        "dismissed",
+        "location_update",
+        "geofence_exit",
+        "geofence_entry"
+      ]
+    },
+    "time": { "type": "string" },
+    "latitude": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "longitude": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

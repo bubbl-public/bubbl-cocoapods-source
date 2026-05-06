@@ -1,0 +1,30 @@
+plugins {
+    id "com.android.library"
+    id "org.jetbrains.kotlin.android"
+}
+
+group = "tech.bubbl.flutter_sdk"
+version = "3.0.0-beta.1"
+
+android {
+    namespace = "tech.bubbl.flutter_sdk"
+    compileSdk = 35
+
+    defaultConfig {
+        minSdk = 27
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+}
+
+dependencies {
+    implementation "tech.bubbl.sdk:bubbl-sdk:3.0.0-beta.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
+}

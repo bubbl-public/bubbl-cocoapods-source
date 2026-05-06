@@ -1,0 +1,98 @@
+package tech.bubbl.sdk
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
+
+data class BubblHttpRequest(
+    val method: String,
+    val url: String,
+    val headers: Map<String, String> = emptyMap(),
+    val body: String? = null
+)
+
+data class BubblHttpResponse(
+    val statusCode: Int,
+    val body: String,
+    val headers: Map<String, List<String>> = emptyMap()
+)
+
+fun interface BubblHttpTransport {
+    suspend fun send(request: BubblHttpRequest): BubblHttpResponse
+}
+
+class UrlConnectionBubblHttpTransport : BubblHttpTransport {
+    override suspend fun send(request: BubblHttpRequest): BubblHttpResponse = withContext(Dispatchers.IO) {
+        val connection = URL(request.url).openConnection() as HttpURLConnection
+        connection.requestMethod = request.method
+        connection.connectTimeout = 30_000
+        connection.readTimeout = 30_000
+        connection.doInput = true
+
+        request.headers.forEach { (name, value) ->
+            connection.setRequestProperty(name, value)
+        }
+
+        request.body?.let { body ->
+            connection.doOutput = true
+            connection.outputStream.use { stream ->
+                stream.write(body.toByteArray(Charsets.UTF_8))
+            }
+        }
+
+        val status = connection.responseCode
+        val responseBody = runCatching {
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+        }.getOrDefault("")
+
+        BubblHttpResponse(
+            statusCode = status,
+            body = responseBody,
+            headers = connection.headerFields
+                .orEmpty()
+                .filterKeys { it != null }
+                .mapKeys { it.key.orEmpty() }
+                .mapValues { it.value.orEmpty() }
+        )
+    }
+}
+
+internal object BubblTransportMap {
+    const val sdkVersion = "3.0.0-beta.1"
+    const val platform = "android"
+
+    const val runtimeAuthHeader = "x-api-key"
+    const val dashboardAuthHeader = "ApiKey"
+
+    const val refreshGeofencePath = "/api/check-geofence"
+    const val refreshPushPath = "/api/check-push"
+    const val getConfigurationPath = "/api/get-config"
+
+    const val registerDevicePath = "/api/device-registerd/create"
+    const val bootBatchPath = "/api/device-data"
+    const val trackEventPath = "/api/activities"
+    const val updateSegmentsPath = "/api/segments"
+    const val submitSurveyResponsePath = "/api/survey-response"
+    const val trackGeofenceBatchPath = "/api/geofence-data"
+
+    fun runtimeBaseUrl(config: BubblConfig): String =
+        config.runtimeBaseUrl ?: when (config.environment) {
+            BubblEnvironment.Development,
+            BubblEnvironment.Nightly -> "https://nightly.api.bubbl.tech"
+            BubblEnvironment.Staging -> "https://staging.api.bubbl.tech"
+            BubblEnvironment.Production -> "https://production.api.bubbl.tech"
+        }
+
+    fun ingestBaseUrl(config: BubblConfig): String =
+        config.ingestBaseUrl ?: when (config.environment) {
+            BubblEnvironment.Development,
+            BubblEnvironment.Nightly -> "https://nightly-platform.bubbl.tech"
+            BubblEnvironment.Staging -> "https://staging-platform.bubbl.tech"
+            BubblEnvironment.Production -> "https://platform.bubbl.tech"
+        }
+
+    fun transmissionDistanceMiles(publicDistanceMeters: Int): Double =
+        publicDistanceMeters.coerceAtLeast(1) / 1609.344
+}

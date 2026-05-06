@@ -1,0 +1,703 @@
+package tech.bubbl.sdk
+
+import android.content.Context
+import android.os.Build
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.time.Instant
+import java.util.Locale
+
+object BubblSdk {
+    private val eventBus = MutableSharedFlow<BubblEvent>(extraBufferCapacity = 64)
+    private var transport: BubblHttpTransport = UrlConnectionBubblHttpTransport()
+    private var store: BubblStore = FileBubblStore(defaultStorageDirectory())
+    private var appContext: Context? = null
+    private var config: BubblConfig? = null
+    private var state: BubblStoredState? = null
+    private var booted: Boolean = false
+    private var cachedConfiguration: BubblConfiguration? = null
+
+    val events: SharedFlow<BubblEvent> = eventBus
+
+    fun install(
+        storageDirectory: File,
+        transport: BubblHttpTransport = UrlConnectionBubblHttpTransport()
+    ) {
+        this.store = FileBubblStore(storageDirectory)
+        this.transport = transport
+        this.appContext = null
+    }
+
+    fun install(
+        context: Context,
+        transport: BubblHttpTransport = UrlConnectionBubblHttpTransport()
+    ) {
+        this.appContext = context.applicationContext
+        this.store = AndroidBubblStore(context.applicationContext)
+        this.transport = transport
+    }
+
+    suspend fun boot(config: BubblConfig): BubblBootResult {
+        require(config.apiKey.isNotBlank()) { "apiKey is required" }
+
+        val previousState = store.loadState()
+        val storedState = previousState.copy(
+            correlationId = config.correlationId ?: previousState.correlationId,
+            segments = config.segments
+        )
+        store.saveState(storedState)
+        store.saveConfig(config)
+
+        this.config = config
+        this.state = storedState
+        this.booted = true
+        this.cachedConfiguration = cachedConfigurationFromDisk()
+
+        enqueue(
+            path = BubblTransportMap.bootBatchPath,
+            payload = deviceDataPayload(config, storedState, activity = "plugin_opened")
+        )
+
+        eventBus.tryEmit(BubblEvent.Ready)
+        appContext?.let {
+            BubblWorkScheduler.schedulePeriodicWork(it, config)
+            if (config.enableLocationTracking && BubblAndroidLocationProvider.hasLocationPermission(it)) {
+                startLocationTracking(it)
+            }
+        }
+
+        return BubblBootResult(
+            ready = true,
+            fromCache = cachedConfiguration != null,
+            deviceRegistered = false,
+            requiresPermission = buildList {
+                if (config.enableLocationTracking) add("location")
+                if (config.enablePushHandling) add("push")
+            },
+            warnings = emptyList()
+        )
+    }
+
+    suspend fun shutdown() {
+        appContext?.let { BubblLocationUpdatesService.stop(it) }
+        booted = false
+        config = null
+    }
+
+    fun startLocationTracking() {
+        val context = appContext ?: error("BubblSdk.install(context) must be called before startLocationTracking().")
+        startLocationTracking(context)
+    }
+
+    fun startLocationTracking(context: Context) {
+        appContext = context.applicationContext
+        if (!BubblAndroidLocationProvider.hasLocationPermission(context.applicationContext)) {
+            eventBus.tryEmit(
+                BubblEvent.Error(
+                    "location_permission_missing",
+                    "Location permission is required to start Bubbl location tracking."
+                )
+            )
+            return
+        }
+
+        runCatching { BubblLocationUpdatesService.start(context.applicationContext) }
+            .onFailure { eventBus.tryEmit(BubblEvent.Error("location_tracking_start_failed", it.message.orEmpty())) }
+    }
+
+    fun stopLocationTracking() {
+        val context = appContext ?: error("BubblSdk.install(context) must be called before stopLocationTracking().")
+        stopLocationTracking(context)
+    }
+
+    fun stopLocationTracking(context: Context) {
+        runCatching { BubblLocationUpdatesService.stop(context.applicationContext) }
+            .onFailure { eventBus.tryEmit(BubblEvent.Error("location_tracking_stop_failed", it.message.orEmpty())) }
+    }
+
+    suspend fun refresh() {
+        getConfiguration()
+        refreshPush()
+    }
+
+    suspend fun refreshGeofence(location: BubblLocation) {
+        recordLocationUpdate(location)
+        val activeConfig = requireConfig()
+        val activeState = requireState()
+        val body = JSONObject()
+            .put("latitude", location.latitude.toString())
+            .put("longitude", location.longitude.toString())
+            .put("distance", BubblTransportMap.transmissionDistanceMiles(activeConfig.defaultDistanceMeters))
+            .put("segmentationTags", activeState.segments.joinToString(","))
+
+        val response = sendRuntime(
+            method = "POST",
+            path = BubblTransportMap.refreshGeofencePath,
+            body = body.toString(),
+            cacheName = "geofence"
+        )
+        cachedConfiguration = configurationFrom(response)
+        processGeofenceRuntime(response, location)
+    }
+
+    suspend fun handleLocationUpdate(location: BubblLocation) {
+        refreshGeofence(location)
+    }
+
+    suspend fun refreshPush() {
+        val response = sendRuntime(
+            method = "GET",
+            path = BubblTransportMap.refreshPushPath,
+            body = null,
+            cacheName = "push"
+        )
+        cachedConfiguration = configurationFrom(response)
+        dispatchRuntimeNotifications(response)
+    }
+
+    suspend fun getConfiguration(): BubblConfiguration? = try {
+        val response = sendRuntime(
+            method = "GET",
+            path = BubblTransportMap.getConfigurationPath,
+            body = null,
+            cacheName = "config"
+        )
+        configurationFrom(response).also { cachedConfiguration = it }
+    } catch (error: Throwable) {
+        eventBus.tryEmit(BubblEvent.Error("runtime_configuration_failed", error.message.orEmpty()))
+        cachedConfiguration ?: cachedConfigurationFromDisk()
+    }
+
+    suspend fun getPrivacyText(): String = getConfiguration()?.privacyText.orEmpty()
+
+    suspend fun updateSegments(tags: List<String>) {
+        val nextState = requireState().copy(segments = tags)
+        saveState(nextState)
+
+        enqueue(
+            path = BubblTransportMap.updateSegmentsPath,
+            payload = JSONObject()
+                .put("device_registered_id", nextState.installId)
+                .put("segmentation", JSONArray(tags))
+        )
+    }
+
+    suspend fun setCorrelationId(value: String) {
+        saveState(requireState().copy(correlationId = value))
+    }
+
+    suspend fun clearCorrelationId() {
+        saveState(requireState().copy(correlationId = null))
+    }
+
+    suspend fun registerPushToken(token: String) {
+        val activeConfig = requireConfig()
+        val nextState = requireState().copy(pushToken = token)
+        saveState(nextState)
+
+        enqueue(
+            path = BubblTransportMap.registerDevicePath,
+            payload = deviceRegistrationPayload(activeConfig, nextState)
+        )
+    }
+
+    suspend fun syncFcmToken(token: String) {
+        registerPushToken(token)
+    }
+
+    suspend fun handleFirebasePayload(
+        payload: Map<String, String>,
+        messageId: String? = null,
+        notificationTitle: String? = null,
+        notificationBody: String? = null
+    ): BubblNotificationPayload? {
+        val notification = BubblNotificationPayloadParser.fromFirebasePayload(
+            payload = payload,
+            messageId = messageId,
+            notificationTitle = notificationTitle,
+            notificationBody = notificationBody
+        )
+
+        if (notification == null) {
+            eventBus.tryEmit(BubblEvent.Error("notification_payload_invalid", "Firebase payload did not contain notification content."))
+            return null
+        }
+
+        handleNotificationPayload(notification)
+        return notification
+    }
+
+    suspend fun showNotification(payload: BubblNotificationPayload): BubblNotificationDisplayResult {
+        eventBus.tryEmit(BubblEvent.NotificationReceived(payload))
+        return renderDefaultNotification(payload)
+    }
+
+    suspend fun handleNotificationPayload(payload: BubblNotificationPayload): BubblNotificationDisplayResult {
+        val activeConfig = requireConfig()
+        eventBus.tryEmit(BubblEvent.NotificationReceived(payload))
+
+        if (!activeConfig.enablePushHandling) {
+            return BubblNotificationDisplayResult(displayed = false, reason = "push_handling_disabled")
+        }
+
+        val result = when (activeConfig.notificationRenderingMode) {
+            BubblNotificationRenderingMode.SdkDefault -> renderDefaultNotification(payload)
+            BubblNotificationRenderingMode.HostRendered ->
+                BubblNotificationDisplayResult(displayed = false, reason = "host_rendered")
+            BubblNotificationRenderingMode.EventOnly ->
+                BubblNotificationDisplayResult(displayed = false, reason = "event_only")
+        }
+
+        return result
+    }
+
+    suspend fun handleNotificationOpen(payload: BubblNotificationPayload, action: String? = null) {
+        requireConfig()
+        eventBus.tryEmit(BubblEvent.NotificationTapped(payload, action))
+        track(notificationInteractionEvent(payload, "notification_opened"))
+    }
+
+    suspend fun handleNotificationCta(payload: BubblNotificationPayload, action: String? = null) {
+        requireConfig()
+        eventBus.tryEmit(BubblEvent.NotificationCtaTapped(payload, action ?: payload.cta?.action))
+        track(notificationInteractionEvent(payload, "notification_cta_tapped"))
+        markGeofenceCtaSuspended(payload)
+    }
+
+    suspend fun handleNotificationMediaViewed(payload: BubblNotificationPayload) {
+        requireConfig()
+        eventBus.tryEmit(BubblEvent.NotificationMediaViewed(payload))
+        track(notificationInteractionEvent(payload, "notification_media_viewed"))
+    }
+
+    suspend fun handleNotificationSurveyRequested(payload: BubblNotificationPayload) {
+        requireConfig()
+        eventBus.tryEmit(BubblEvent.NotificationSurveyRequested(payload))
+        track(notificationInteractionEvent(payload, "notification_survey_requested"))
+    }
+
+    private suspend fun renderDefaultNotification(payload: BubblNotificationPayload): BubblNotificationDisplayResult {
+        val activeConfig = requireConfig()
+        if (!activeConfig.enablePushHandling) {
+            return BubblNotificationDisplayResult(displayed = false, reason = "push_handling_disabled")
+        }
+
+        val context = appContext
+        val result = if (context == null) {
+            BubblNotificationDisplayResult(displayed = false, reason = "android_context_not_installed")
+        } else {
+            BubblAndroidNotificationRuntime.show(context, payload)
+        }
+
+        if (result.displayed) {
+            eventBus.tryEmit(BubblEvent.NotificationDisplayed(payload))
+            track(notificationDeliveredEvent(payload))
+        } else if (result.reason !in setOf("duplicate_notification")) {
+            eventBus.tryEmit(BubblEvent.Error("notification_display_failed", result.reason.orEmpty()))
+        }
+
+        return result
+    }
+
+    private suspend fun dispatchRuntimeNotifications(body: String) {
+        val payloads = BubblRuntimeNotificationExtractor.fromRuntimeResponse(body)
+        payloads.forEach { payload ->
+            runCatching { handleNotificationPayload(payload) }
+                .onFailure { error ->
+                    eventBus.tryEmit(BubblEvent.Error("runtime_notification_failed", error.message.orEmpty()))
+                }
+        }
+    }
+
+    private suspend fun recordLocationUpdate(location: BubblLocation) {
+        requireState()
+        eventBus.tryEmit(BubblEvent.LocationUpdated(location))
+        track(
+            BubblTrackEvent(
+                type = "location",
+                activity = "location_update",
+                latitude = location.latitude,
+                longitude = location.longitude
+            )
+        )
+    }
+
+    private suspend fun processGeofenceRuntime(body: String, location: BubblLocation) {
+        eventBus.tryEmit(
+            BubblEvent.GeofenceSnapshot(
+                BubblGeofenceSnapshotParser.fromRuntimeResponse(body)
+            )
+        )
+
+        val state = loadGeofenceState()
+        val evaluation = BubblGeofenceEngine.evaluate(
+            runtimeResponse = body,
+            location = location,
+            state = state
+        )
+        saveGeofenceState(evaluation.nextState)
+
+        for (transition in evaluation.transitions) {
+            eventBus.tryEmit(
+                when (transition.type) {
+                    BubblGeofenceTransitionType.Enter -> BubblEvent.GeofenceEntered(transition)
+                    BubblGeofenceTransitionType.Exit -> BubblEvent.GeofenceExited(transition)
+                }
+            )
+            track(transitionEvent(transition))
+        }
+
+        for (dispatch in evaluation.notifications) {
+            enqueueGeofenceNotificationBatch(dispatch)
+            runCatching { handleNotificationPayload(dispatch.payload) }
+                .onFailure { error ->
+                    eventBus.tryEmit(BubblEvent.Error("geofence_notification_failed", error.message.orEmpty()))
+                }
+        }
+    }
+
+    suspend fun track(event: BubblTrackEvent) {
+        val activeState = requireState()
+        val payload = JSONObject()
+            .put("device_registered_id", activeState.installId)
+            .put("type", event.type)
+            .put("activity", event.activity)
+            .put("time", isoNow())
+
+        event.locationId?.toIntOrNull()?.let { payload.put("location_id", it) }
+        event.curatedNotificationId?.toIntOrNull()?.let { payload.put("curated_notification_id", it) }
+        event.latitude?.let { payload.put("latitude", it) }
+        event.longitude?.let { payload.put("longitude", it) }
+
+        enqueue(path = BubblTransportMap.trackEventPath, payload = payload)
+    }
+
+    suspend fun submitSurveyResponse(response: BubblSurveyResponse) {
+        val activeState = requireState()
+        val payload = JSONObject()
+            .put("device_registered_id", activeState.installId)
+            .put("activity", "survey_submit")
+            .put("curated_notification_id", response.curatedNotificationId.toIntOrNull() ?: response.curatedNotificationId)
+            .put("responses", JSONArray(response.answers.map(::surveyAnswerPayload)))
+            .put("time", isoNow())
+
+        response.locationId?.toIntOrNull()?.let { payload.put("location_id", it) }
+
+        enqueue(path = BubblTransportMap.submitSurveyResponsePath, payload = payload)
+    }
+
+    suspend fun flush(): BubblFlushResult {
+        val queue = runCatching { store.loadQueue() }.getOrElse {
+            eventBus.tryEmit(BubblEvent.Error("ingest_queue_failed", it.message.orEmpty()))
+            return BubblFlushResult(pendingCount = store.pendingCount())
+        }
+        val remaining = mutableListOf<BubblQueuedRequest>()
+
+        queue.forEach { entry ->
+            runCatching { sendIngest(entry) }
+                .onFailure { error ->
+                    remaining += entry.withAttempt()
+                    eventBus.tryEmit(BubblEvent.Error("ingest_flush_failed", error.message.orEmpty()))
+                }
+        }
+
+        store.saveQueue(remaining)
+        eventBus.tryEmit(BubblEvent.Diagnostic(BubblDiagnostics(booted = booted, pendingIngestCount = remaining.size)))
+
+        return BubblFlushResult(pendingCount = remaining.size)
+    }
+
+    suspend fun diagnostics(): BubblDiagnostics = BubblDiagnostics(
+        booted = booted,
+        pendingIngestCount = store.pendingCount()
+    )
+
+    private suspend fun enqueue(path: String, payload: JSONObject) {
+        store.append(BubblQueuedRequest(path = path, body = payload.toString()))
+        appContext?.let { BubblWorkScheduler.scheduleFlush(it) }
+    }
+
+    private suspend fun sendRuntime(method: String, path: String, body: String?, cacheName: String): String {
+        val activeConfig = requireConfig()
+        val activeState = requireState()
+        val request = BubblHttpRequest(
+            method = method,
+            url = endpointUrl(BubblTransportMap.runtimeBaseUrl(activeConfig), path),
+            headers = headers(BubblTransportMap.runtimeAuthHeader, activeConfig, activeState),
+            body = body
+        )
+
+        return try {
+            val response = transport.send(request)
+            check(response.statusCode in 200..299) { "Runtime returned HTTP ${response.statusCode}" }
+            store.saveRuntimeCache(cacheName, response.body)
+            response.body
+        } catch (error: Throwable) {
+            store.loadRuntimeCache(cacheName) ?: throw error
+        }
+    }
+
+    private suspend fun sendIngest(entry: BubblQueuedRequest) {
+        val activeConfig = requireConfig()
+        val activeState = requireState()
+        val requestHeaders = headers(BubblTransportMap.dashboardAuthHeader, activeConfig, activeState) +
+            mapOf("Idempotency-Key" to entry.idempotencyKey)
+        val response = transport.send(
+            BubblHttpRequest(
+                method = "POST",
+                url = endpointUrl(BubblTransportMap.ingestBaseUrl(activeConfig), entry.path),
+                headers = requestHeaders,
+                body = entry.body
+            )
+        )
+
+        check(response.statusCode in 200..299) { "Ingest returned HTTP ${response.statusCode}" }
+    }
+
+    private fun requireConfig(): BubblConfig = config ?: error("BubblSdk.boot(config) must be called first")
+    private fun requireState(): BubblStoredState = state ?: error("BubblSdk.boot(config) must be called first")
+
+    private suspend fun saveState(nextState: BubblStoredState) {
+        store.saveState(nextState)
+        state = nextState
+    }
+
+    internal suspend fun restoreForBackground(): Boolean {
+        val restoredConfig = store.loadConfig() ?: return false
+        val restoredState = store.loadState()
+        config = restoredConfig
+        state = restoredState
+        cachedConfiguration = cachedConfigurationFromDisk()
+        return true
+    }
+
+    internal fun hasRuntimeState(): Boolean =
+        config != null && state != null
+
+    internal suspend fun refreshGeofenceFromLastKnownLocation(context: Context): Boolean {
+        val activeConfig = config ?: return false
+        if (!activeConfig.enableLocationTracking) return false
+
+        val location = BubblAndroidLocationProvider.lastKnownLocation(context) ?: return false
+        refreshGeofence(location)
+        return true
+    }
+
+    internal fun locationTrackingEnabled(): Boolean =
+        config?.enableLocationTracking == true
+
+    internal fun locationTrackingSettings(): BubblLocationTrackingSettings {
+        val activeConfig = config
+        return BubblLocationTrackingSettings(
+            minTimeMillis = ((activeConfig?.refreshIntervalSeconds ?: 60).coerceAtLeast(30) * 1_000L),
+            minDistanceMeters = (activeConfig?.defaultDistanceMeters ?: 50).coerceAtLeast(10).toFloat()
+        )
+    }
+
+    internal fun emitError(code: String, message: String) {
+        eventBus.tryEmit(BubblEvent.Error(code, message))
+    }
+
+    private suspend fun cachedConfigurationFromDisk(): BubblConfiguration? {
+        for (name in listOf("config", "geofence", "push")) {
+            val cached = store.loadRuntimeCache(name) ?: continue
+            val configuration = runCatching { configurationFrom(cached) }.getOrNull()
+            if (configuration != null) {
+                return configuration
+            }
+        }
+
+        return null
+    }
+
+    private suspend fun loadGeofenceState(): BubblGeofenceState =
+        store.loadRuntimeCache("geofence-state")
+            ?.let { runCatching { BubblGeofenceState.fromJson(JSONObject(it)) }.getOrNull() }
+            ?: BubblGeofenceState()
+
+    private suspend fun saveGeofenceState(state: BubblGeofenceState) {
+        store.saveRuntimeCache("geofence-state", state.toJson().toString())
+    }
+
+    private suspend fun markGeofenceCtaSuspended(payload: BubblNotificationPayload) {
+        val triggerKey = payload.raw[BubblGeofenceTriggerMetadata.triggerKey]
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+        val shouldSuspend = payload.raw[BubblGeofenceTriggerMetadata.ctaSuspend]
+            ?.let { value ->
+                value.equals("true", ignoreCase = true) ||
+                    value == "1" ||
+                    value.equals("yes", ignoreCase = true)
+            }
+            ?: false
+
+        if (!shouldSuspend) return
+
+        val state = loadGeofenceState()
+        if (triggerKey in state.ctaSuspensions) return
+
+        saveGeofenceState(
+            state.copy(ctaSuspensions = state.ctaSuspensions + triggerKey)
+        )
+    }
+
+    private fun configurationFrom(body: String): BubblConfiguration {
+        val configuration = JSONObject(body).getJSONObject("configuration")
+        return BubblConfiguration(
+            notificationsCount = configuration.optInt("notificationsCount"),
+            daysCount = configuration.optInt("daysCount"),
+            batteryCount = configuration.optInt("batteryCount"),
+            privacyText = configuration.optString("privacyText")
+        )
+    }
+
+    private fun headers(authHeader: String, config: BubblConfig, state: BubblStoredState): Map<String, String> =
+        mapOf(
+            authHeader to config.apiKey,
+            "Content-Type" to "application/json",
+            "Accept" to "application/json",
+            "X-Bubbl-SDK-Version" to BubblTransportMap.sdkVersion,
+            "X-Bubbl-SDK-Platform" to BubblTransportMap.platform,
+            "X-Bubbl-Request-ID" to java.util.UUID.randomUUID().toString(),
+            "X-Bubbl-Install-ID" to state.installId
+        )
+
+    private fun deviceRegistrationPayload(config: BubblConfig, state: BubblStoredState): JSONObject =
+        JSONObject()
+            .put("app_name", "Bubbl Android App")
+            .put("api_key", config.apiKey)
+            .put("sdk_version", BubblTransportMap.sdkVersion)
+            .put("platform", BubblTransportMap.platform)
+            .put("os_version", Build.VERSION.RELEASE ?: "")
+            .put("device_model", Build.MODEL ?: "Android device")
+            .put("device_name", Build.DEVICE ?: "Android device")
+            .put("manufacturer", Build.MANUFACTURER ?: "Android")
+            .put("country", Locale.getDefault().country.orEmpty())
+            .put("language", Locale.getDefault().language.orEmpty())
+            .put("device_id", state.installId)
+            .put("segmentations", JSONArray(state.segments))
+            .put("correlation_id", state.correlationId ?: JSONObject.NULL)
+            .put("bubbl_id", state.installId)
+            .put("device_token", state.pushToken ?: JSONObject.NULL)
+
+    private fun deviceDataPayload(config: BubblConfig, state: BubblStoredState, activity: String): JSONObject =
+        JSONObject()
+            .put("device_registered", deviceRegistrationPayload(config, state))
+            .put(
+                "plugin_activity",
+                JSONObject()
+                    .put("device_registered_id", state.installId)
+                    .put("time", isoNow())
+                    .put("activity", activity)
+            )
+            .put(
+                "raw_data",
+                JSONObject()
+                    .put("event", "boot")
+                    .put(
+                        "request",
+                        JSONObject()
+                            .put("source", "sdk-v3")
+                            .put("environment", config.environment.name.lowercase())
+                    )
+            )
+
+    private fun surveyAnswerPayload(answer: BubblSurveyAnswer): JSONObject =
+        JSONObject()
+            .put("question_id", answer.questionId.toIntOrNull() ?: answer.questionId)
+            .put("type", answer.type)
+            .put("value", answer.value ?: JSONObject.NULL)
+            .put(
+                "choice",
+                JSONArray(answer.choiceIds.map { choiceId ->
+                    JSONObject().put("choice_id", choiceId.toIntOrNull() ?: choiceId)
+                })
+            )
+
+    private fun notificationDeliveredEvent(payload: BubblNotificationPayload): BubblTrackEvent =
+        BubblTrackEvent(
+            type = "notification",
+            activity = "notification_delivered",
+            locationId = payload.locationId,
+            curatedNotificationId = payload.curatedNotificationId
+        )
+
+    private fun notificationInteractionEvent(payload: BubblNotificationPayload, activity: String): BubblTrackEvent =
+        BubblTrackEvent(
+            type = "notification",
+            activity = activity,
+            locationId = payload.locationId,
+            curatedNotificationId = payload.curatedNotificationId
+        )
+
+    private fun transitionEvent(transition: BubblGeofenceTransition): BubblTrackEvent =
+        BubblTrackEvent(
+            type = "geofence",
+            activity = when (transition.type) {
+                BubblGeofenceTransitionType.Enter -> "geofence_entry"
+                BubblGeofenceTransitionType.Exit -> "geofence_exit"
+            },
+            locationId = transition.locationId,
+            latitude = transition.location.latitude,
+            longitude = transition.location.longitude
+        )
+
+    private suspend fun enqueueGeofenceNotificationBatch(dispatch: BubblGeofenceNotificationDispatch) {
+        val activeState = requireState()
+        val transition = dispatch.transition
+        val payload = dispatch.payload
+        val notificationId = payload.curatedNotificationId?.toIntOrNull() ?: payload.id.toIntOrNull() ?: return
+        val locationId = transition.locationId?.toIntOrNull() ?: payload.locationId?.toIntOrNull() ?: return
+        val time = isoNow()
+
+        enqueue(
+            path = BubblTransportMap.trackGeofenceBatchPath,
+            payload = JSONObject()
+                .put(
+                    "geo",
+                    JSONObject()
+                        .put("location_id", locationId)
+                        .put("device_registered_id", activeState.installId)
+                        .put("time", time)
+                        .put(
+                            "activity",
+                            when (transition.type) {
+                                BubblGeofenceTransitionType.Enter -> "geofence_entry"
+                                BubblGeofenceTransitionType.Exit -> "geofence_exit"
+                            }
+                        )
+                        .put("latitude", transition.location.latitude)
+                        .put("longitude", transition.location.longitude)
+                )
+                .put(
+                    "location",
+                    JSONObject()
+                        .put("device_registered_id", activeState.installId)
+                        .put("time", time)
+                        .put("activity", "location_update")
+                        .put("latitude", transition.location.latitude)
+                        .put("longitude", transition.location.longitude)
+                )
+                .put(
+                    "notification",
+                    JSONObject()
+                        .put("device_registered_id", activeState.installId)
+                        .put("time", time)
+                        .put("activity", "notification_sent")
+                        .put("curated_notification_id", notificationId)
+                        .put("allow", true)
+                )
+        )
+    }
+
+    private fun endpointUrl(baseUrl: String, path: String): String =
+        baseUrl.trimEnd('/') + path
+
+    private fun isoNow(): String = Instant.now().toString()
+
+    private fun defaultStorageDirectory(): File =
+        File(System.getProperty("java.io.tmpdir") ?: ".", "tech.bubbl.sdk")
+}

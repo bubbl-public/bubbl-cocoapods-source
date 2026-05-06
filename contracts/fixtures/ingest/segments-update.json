@@ -1,0 +1,4 @@
+{
+  "device_registered_id": "stable-device-id",
+  "segmentation": ["vip", "beta"]
+}
