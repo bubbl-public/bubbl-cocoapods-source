@@ -16,7 +16,7 @@ concurrency:
 env:
   NODE_VERSION: '22'
   JAVA_VERSION: '17'
-  GRADLE_VERSION: '8.2.1'
+  GRADLE_VERSION: '8.5'
   DRY_RUN: ${{ github.event_name != 'push' }}
 
 jobs:
