@@ -128,7 +128,7 @@ flutter:publish:pub-dev:
 
         printf '%s' "$PUB_DEV_GOOGLE_SERVICE_ACCOUNT_KEY_B64" | base64 --decode > /tmp/pub-dev-key.json
         gcloud auth activate-service-account --key-file=/tmp/pub-dev-key.json
-        gcloud auth print-identity-token --audiences=https://pub.dev --include-email \
+        gcloud auth print-identity-token --audiences=https://pub.dev \
           | dart pub token add https://pub.dev
         rm -f /tmp/pub-dev-key.json
       elif [ -n "${PUB_DEV_CREDENTIALS_B64:-}" ]; then
