@@ -4,20 +4,20 @@ This is the release gate for moving v3 from beta candidate to a production SDK f
 
 ## Current Verdict
 
-**Beta-ready, not GA-ready yet.** Android, iOS, Flutter, and React Native now have native runtime wiring and strict local readiness can pass at `3.0.0-beta.1`. The repo still needs staging/device canaries, CI proof against published artifacts, and final notification/location production polish before `3.0.0`.
+**Beta-ready, not GA-ready yet.** Android, iOS, Flutter, and React Native now have native runtime wiring and strict local readiness can pass at `3.0.0`. The repo still needs staging/device canaries, CI proof against published artifacts, and final notification/location production polish before `3.0.0`.
 
 The transport map is still correct for the current platform split:
 
 - Transmission runtime: `POST /api/check-geofence`, `GET /api/check-push`, `GET /api/get-config`.
-- Renewed Dashboard ingest: `POST /api/device-registerd/create`, `POST /api/device-data`, `POST /api/geofence-data`, `POST /api/activities`, `POST /api/segments`, `POST /api/survey-response`.
-- Default environment endpoints now mirror the legacy Android/iOS SDKs: `development` and `nightly` use nightly, `staging` uses staging, and `production` uses `production.api.bubbl.tech` for Transmission plus `platform.bubbl.tech` for ingest.
+- Renewed Ingest service: `POST /api/device-registerd/create`, `POST /api/device-data`, `POST /api/geofence-data`, `POST /api/activities`, `POST /api/segments`, `POST /api/survey-response`.
+- Default environment endpoints now use the renewed split hosts: `nightly.api|transmission|ingest.bubbl.tech`, `staging.api|transmission|ingest.bubbl.tech`, and production `api|transmission|ingest.bubbl.tech`.
 - Public SDK distance remains meters; native clients convert to the current Transmission v2 `distance` wire unit at send time.
 
 ## Gates
 
 ### Beta Gate
 
-Satisfied for `3.0.0-beta.1`:
+Satisfied for `3.0.0`:
 
 - Android and iOS native SDKs pass unit tests and local canaries.
 - Flutter calls through to native Android/iOS cores, and React Native calls through to native Android/iOS cores instead of returning scaffold responses.
@@ -57,7 +57,7 @@ Must be true before `3.0.0`:
 | CI | Configured | CI and release workflows now run strict readiness plus registry configuration checks. Still needs the new monorepo to be pushed to GitHub with secrets/environments configured. |
 | Notifications | Partially ready | Android rich image notifications, iOS media attachments, CTA action routing, default UI, and notification telemetry exist. Still needs durable cross-source frequency gates, permission helpers, and polished customization hooks. |
 | Location | Needs hardening | Add foreground/background lifecycle switching, permission helpers, live movement canary evidence, and map overlay snapshots. |
-| Backend staging | Needs proof | Run SDK canaries against renewed Dashboard ingest and Transmission runtime with real staging credentials and Firebase/APNs config. |
+| Backend staging | Needs proof | Run SDK canaries against renewed Ingest and Transmission services with real staging credentials and Firebase/APNs config. |
 
 ## P1 Production Work
 

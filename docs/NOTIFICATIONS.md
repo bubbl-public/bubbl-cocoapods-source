@@ -10,6 +10,19 @@ The v3 distinction is:
 
 The SDK should make the common path easy while keeping host apps in control when they need custom behavior.
 
+Apps that want their own in-app notification modal should keep
+`notificationRenderingMode` as `sdkDefault` and set
+`enableDefaultNotificationModal` to `false`, or call the wrapper helper
+`disableDefaultNotificationModal()` after boot. That keeps Firebase/runtime/
+geofence device notifications, dedupe, and analytics in the SDK while stopping
+the bundled detail/modal UI from drawing on top of the host app's custom UI.
+
+Apps with an in-app notification inbox/history can call
+`openNotificationModal(payload)` to open the SDK's bundled detail UI for an
+already stored notification. This does not trigger a second device notification;
+it presents the default detail/survey UI and routes the open through the same
+analytics path as an external notification-tray tap.
+
 ## Current Native Slice
 
 Implemented in this repository now:
@@ -21,10 +34,12 @@ Implemented in this repository now:
   - `/api/check-geofence` `geoCampaign[]` entries are parsed into geofence polygons, enter/exit activation rules, notification payloads, cooldowns, and maximum trigger gates.
   - Geofence-sourced notifications are dispatched through the same native pipeline only after the native transition engine detects an eligible enter/exit.
   - Runtime parsing is tolerant of legacy field variants such as `headline`, `body`, `curatedNotificationId`, `locationId`, `ctaLabel`, `ctaUrl`, `mediaUrl`, `media[]`, `cta[]`, and `questions`.
+  - Dashboard notification analytics only treat `curated_notification_id`, `curatedNotificationId`, `curated_notification`, `curatedNotification`, `n_id`, and `nId` as canonical curated notification IDs. Generic provider fields such as `notification_id` and `notificationId` are retained for local notification identity/dedupe but are never sent to Dashboard as curated IDs.
+  - While v3 exposes typed interaction names internally, legacy `/api/activities` posts use Dashboard's historical activity strings: `notification_sent`, `notification_delivered`, `cta_engagment`, `media_viewed`, and `dismissed`; plain opens and automatic survey-render events stay local until the v1 ingest path can store them explicitly.
 - Native geofence transition engine:
   - Persists last location, inside/outside state, notification trigger counts, and last trigger timestamps in the existing runtime cache.
   - Emits typed location update, geofence entered, and geofence exited events.
-  - Queues location/geofence activity and geofence notification batches to the renewed Dashboard legacy-mirrored ingest paths.
+  - Queues location/geofence activity and geofence notification batches to the renewed Ingest service paths.
   - Suppresses repeat notifications while the device remains inside a region and enforces notification/campaign cooldown and maximum trigger values.
 - Android Firebase bridge:
   - Bundled `BubblFirebaseMessagingService`.
@@ -34,10 +49,17 @@ Implemented in this repository now:
   - Big-picture image notifications for image media payloads, with text fallback when media cannot be downloaded.
   - CTA notification actions route through the bundled tap activity and queue CTA analytics.
   - Notification taps route through bundled `BubblNotificationActivity`.
+  - `openNotificationModal(context, payload)` opens the bundled detail/survey UI from an in-app inbox/history row without posting a new system notification.
+  - Firebase auto-rendered notification taps that launch the host app can be forwarded from `MainActivity`. Native apps can choose `BubblNotificationTapPresentation.DefaultModal` for the bundled modal or `HostModal` for a custom modal; React Native apps can call `BubblSdkNotificationIntents.openDefaultModal(this, intent)` or `openHostModal(this, intent)`.
+  - Custom-modal notification taps are kept pending across cold start and replayed as `notificationTapped` when the React Native bridge subscribes, so tray taps can open host-rendered UI even when the app was not already running.
   - Bundled Android detail/survey UI can show title/body, media, CTA, and simple survey questions.
+  - Default Android detail UI is system-bar/display-cutout aware, keeps content vertically centered when it fits, scrolls when needed, and includes a close button.
+  - Apps can disable the bundled Android detail UI with `enableDefaultNotificationModal = false` / `disableDefaultNotificationModal()` while still allowing the SDK to trigger the device notification. Notification taps are tracked and then the host app is brought forward instead of drawing the bundled detail activity.
   - `POST_NOTIFICATIONS` manifest permission.
   - Short-window duplicate suppression by notification ID.
-  - Delivered/opened/CTA/media/survey-requested analytics queued to `/api/activities`.
+  - Received/displayed/opened/CTA/media/survey-requested analytics queued to `/api/activities`.
+  - Notification analytics are not enqueued to Dashboard unless a Dashboard-canonical curated notification ID is present, avoiding legacy Dashboard 404s from Firebase/provider IDs.
+  - Notification receipt/display telemetry is opportunistically flushed so Dashboard receives it without waiting for a later manual flush.
 - iOS notification bridge:
   - `handleRemoteNotification(_:)` for APNs-style payloads.
   - `handleFirebasePayload(_:)` for FCM data payloads.
@@ -47,7 +69,11 @@ Implemented in this repository now:
   - Remote media payloads become `UNNotificationAttachment` files when supported, with notification display continuing if attachment download fails.
   - CTA actions are registered as notification categories and route through the existing response analytics path.
   - Default UIKit `BubblNotificationViewController` for notification detail, media, CTA, and simple surveys.
-  - Delivered/opened/CTA/media/survey-requested analytics queued to `/api/activities`.
+  - `openNotificationModal(payload)` opens the bundled detail/survey UI from an in-app inbox/history row without posting a new system notification.
+  - Default iOS detail UI is safe-area aware for Dynamic Island/notches/home indicator, keeps content vertically centered when it fits, scrolls when needed, and includes a close button.
+  - Received/displayed/opened/CTA/media/survey-requested analytics queued to `/api/activities`.
+  - Notification analytics are not enqueued to Dashboard unless a Dashboard-canonical curated notification ID is present, avoiding legacy Dashboard 404s from APNs/Firebase/provider IDs.
+  - Notification receipt/display telemetry is opportunistically flushed so Dashboard receives it without waiting for a later manual flush.
 - Location integration:
   - Android periodic WorkManager refresh uses the device's last known location when `enableLocationTracking` is enabled and location permission is granted.
   - Android includes `BubblLocationUpdatesService`, an opted-in foreground location service started by `enableLocationTracking` when permission is already granted or manually through `startLocationTracking()`.
@@ -55,7 +81,7 @@ Implemented in this repository now:
   - Apps that own their own region/location stack can forward wakes through `BubblLocationMonitor.handleRegionWake(location:)`.
   - iOS `BubblLocationMonitor` can update background `CLCircularRegion` monitoring from cached Transmission geofence data, selecting the nearest 20 campaign regions to respect the platform region cap.
 - Host apps on any native/wrapper surface can manually forward location fixes through `handleLocationUpdate(location)`.
-- Flutter and React Native wrapper calls forward to the same native Android/iOS notification, location, geofence, and ingest engines instead of reimplementing runtime behavior in wrapper code.
+- Flutter and React Native wrapper calls, including `openNotificationModal(...)`, forward to the same native Android/iOS notification, location, geofence, and ingest engines instead of reimplementing runtime behavior in wrapper code.
 - Android connected canaries cover the foreground service route into geofence refresh/transition telemetry.
   - iOS simulator canary covers the monitor region-wake route into geofence refresh/transition telemetry.
 
@@ -137,6 +163,8 @@ The default UI should:
 
 - Subscribe to typed notification events from the native runtime.
 - Render notification details, media, CTA, and surveys.
+- Keep text and controls inside platform safe areas, away from status bars, Dynamic Island/notches, display cutouts, and home indicators.
+- Provide a visible close action.
 - Submit survey responses through the core SDK.
 - Allow host apps to replace copy, colors, layout, media presentation, CTA handling, and survey completion behavior.
 - Avoid embedding their own networking, dedupe, or Firebase logic.
@@ -193,6 +221,11 @@ Future runtime/UI config should separate:
 - `notificationRenderingMode`: `sdkDefault`, `eventOnly`, `hostRendered`
 - `enableDefaultNotificationModal`
 - `enableDefaultSurveyUi`
+
+Use `hostRendered` only when the host app wants to take over notification
+rendering entirely. Use `sdkDefault` plus `enableDefaultNotificationModal =
+false` when the SDK should still trigger native device notifications but the app
+will render its own in-app modal from SDK events.
 
 ## Internal Modularity
 

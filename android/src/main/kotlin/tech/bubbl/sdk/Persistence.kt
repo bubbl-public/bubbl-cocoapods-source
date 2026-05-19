@@ -157,6 +157,7 @@ internal fun BubblConfig.toJson(): JSONObject = JSONObject()
     .put("apiKey", apiKey)
     .put("environment", environment.name)
     .put("runtimeBaseUrl", runtimeBaseUrl ?: JSONObject.NULL)
+    .put("transmissionBaseUrl", transmissionBaseUrl ?: JSONObject.NULL)
     .put("ingestBaseUrl", ingestBaseUrl ?: JSONObject.NULL)
     .put("segments", JSONArray(segments))
     .put("correlationId", correlationId ?: JSONObject.NULL)
@@ -173,6 +174,7 @@ internal fun bubblConfigFromJson(json: JSONObject): BubblConfig = BubblConfig(
     apiKey = json.getString("apiKey"),
     environment = enumValueOf(json.optString("environment", BubblEnvironment.Staging.name)),
     runtimeBaseUrl = json.optNullableString("runtimeBaseUrl"),
+    transmissionBaseUrl = json.optNullableString("transmissionBaseUrl"),
     ingestBaseUrl = json.optNullableString("ingestBaseUrl"),
     segments = json.optJSONArray("segments")?.toStringList().orEmpty(),
     correlationId = json.optNullableString("correlationId"),

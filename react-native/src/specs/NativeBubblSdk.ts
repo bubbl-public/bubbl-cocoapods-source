@@ -5,6 +5,7 @@ export type BubblBootOptions = {
   apiKey: string;
   environment?: string;
   runtimeBaseUrl?: string | null;
+  transmissionBaseUrl?: string | null;
   ingestBaseUrl?: string | null;
   segments?: string[];
   correlationId?: string | null;
@@ -32,11 +33,13 @@ export interface Spec extends TurboModule {
   updateSegments(tags: string[]): Promise<void>;
   setCorrelationId(value: string): Promise<void>;
   clearCorrelationId(): Promise<void>;
+  setDefaultNotificationModalEnabled(enabled: boolean): Promise<void>;
   registerPushToken(token: string): Promise<void>;
   handleFirebasePayload(payload: Object): Promise<Object | null>;
   showNotification(payload: Object): Promise<Object>;
   handleNotificationPayload(payload: Object): Promise<Object>;
   handleNotificationOpen(payload: Object, action?: string | null): Promise<void>;
+  openNotificationModal(payload: Object, action?: string | null): Promise<boolean>;
   handleNotificationCta(payload: Object, action?: string | null): Promise<void>;
   handleNotificationMediaViewed(payload: Object): Promise<void>;
   handleNotificationSurveyRequested(payload: Object): Promise<void>;

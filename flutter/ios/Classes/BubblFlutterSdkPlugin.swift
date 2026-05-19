@@ -113,6 +113,9 @@ public final class BubblFlutterSdkPlugin: NSObject, FlutterPlugin, FlutterStream
         case "clearCorrelationId":
             try await sdk.clearCorrelationId()
             return nil
+        case "setDefaultNotificationModalEnabled":
+            try await sdk.setDefaultNotificationModalEnabled(call.argumentsMap().bool("enabled", default: true))
+            return nil
         case "registerPushToken":
             try await sdk.registerPushToken(call.argumentsMap().requiredString("token"))
             return nil
@@ -127,6 +130,9 @@ public final class BubblFlutterSdkPlugin: NSObject, FlutterPlugin, FlutterStream
             let args = try call.argumentsMap()
             try await sdk.handleNotificationOpen(args.payloadArgument(), action: args.string("action"))
             return nil
+        case "openNotificationModal":
+            let args = try call.argumentsMap()
+            return try await sdk.openNotificationModal(args.payloadArgument(), action: args.string("action"))
         case "handleNotificationCta":
             let args = try call.argumentsMap()
             try await sdk.handleNotificationCTA(args.payloadArgument(), action: args.string("action"))
@@ -217,6 +223,7 @@ private extension Dictionary where Key == String, Value == Any {
             apiKey: try requiredString("apiKey"),
             environment: BubblEnvironment(rawValue: string("environment") ?? "staging") ?? .staging,
             runtimeBaseUrl: string("runtimeBaseUrl").flatMap(URL.init(string:)),
+            transmissionBaseUrl: string("transmissionBaseUrl").flatMap(URL.init(string:)),
             ingestBaseUrl: string("ingestBaseUrl").flatMap(URL.init(string:)),
             segments: stringArray("segments"),
             correlationId: string("correlationId"),
@@ -348,7 +355,8 @@ private extension BubblDiagnostics {
             "sdkVersion": sdkVersion,
             "platform": platform,
             "booted": booted,
-            "pendingIngestCount": pendingIngestCount
+            "pendingIngestCount": pendingIngestCount,
+            "pushTokenSuffix": pushTokenSuffix
         ]
     }
 }

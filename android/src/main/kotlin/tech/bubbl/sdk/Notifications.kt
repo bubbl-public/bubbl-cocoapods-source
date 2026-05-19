@@ -13,7 +13,9 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.graphics.Typeface
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -26,6 +28,8 @@ import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
@@ -41,6 +45,10 @@ import java.util.Locale
 import kotlin.math.absoluteValue
 
 public open class BubblFirebaseMessagingService : FirebaseMessagingService() {
+    private companion object {
+        private const val logTag = "BubblSdk"
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -65,12 +73,21 @@ public open class BubblFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
+        Log.i(logTag, "New FCM token received from FirebaseMessagingService (${token.length} chars)")
         BubblSdk.install(applicationContext)
 
         scope.launch {
             if (BubblSdk.restoreForBackground()) {
+                Log.d(logTag, "REG-TOKEN-02 syncing rotated FCM token")
                 BubblSdk.syncFcmToken(token)
-                BubblSdk.flush()
+                val result = BubblSdk.flush()
+                if (result.pendingCount == 0) {
+                    Log.i(logTag, "REG-TOKEN-02 token synced successfully")
+                } else {
+                    Log.w(logTag, "REG-TOKEN-02 token queued but ${result.pendingCount} ingest request(s) remain pending")
+                }
+            } else {
+                Log.w(logTag, "REG-TOKEN-02 token received before BubblSdk boot state was available")
             }
         }
     }
@@ -99,6 +116,7 @@ public class BubblNotificationActivity : Activity() {
 
         val tapAction = intent.getStringExtra(BubblNotificationPayloadCodec.extraAction)
             ?: BubblNotificationPayloadCodec.actionDefault
+        val forceDefaultModal = intent.getBooleanExtra(BubblNotificationPayloadCodec.extraForceDefaultModal, false)
 
         scope.launch {
             if (BubblSdk.restoreForBackground()) {
@@ -108,12 +126,18 @@ public class BubblNotificationActivity : Activity() {
                     notificationPayload.cta.url?.let(::openUrl)
                 }
                 BubblSdk.flush()
+
+                if (!forceDefaultModal && !BubblSdk.defaultNotificationModalEnabled()) {
+                    launchHostApp(notificationPayload, tapAction)
+                    finish()
+                    return@launch
+                }
             } else {
                 BubblSdk.emitError("notification_not_booted", "Opened notification before BubblSdk.boot(config).")
             }
-        }
 
-        setContentView(defaultContentView(notificationPayload))
+            setContentView(defaultContentView(notificationPayload))
+        }
     }
 
     override fun onDestroy() {
@@ -125,9 +149,38 @@ public class BubblNotificationActivity : Activity() {
         val density = resources.displayMetrics.density
         fun dp(value: Int): Int = (value * density).toInt()
 
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setPadding(0, dp(8), 0, dp(8))
+        }
+
+        val header = LinearLayout(this).apply {
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            minimumHeight = dp(52)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(dp(16), 0, dp(16), 0)
+        }
+
+        header.addView(Button(this).apply {
+            text = "Close"
+            minHeight = dp(44)
+            minWidth = dp(72)
+            setOnClickListener { finish() }
+        })
+
+        root.addView(header)
+
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(28), dp(24), dp(28))
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(24), dp(16), dp(24), dp(32))
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -237,9 +290,18 @@ public class BubblNotificationActivity : Activity() {
                 setOnClickListener {
                     isEnabled = false
                     scope.launch {
+                        val curatedNotificationId = payload.curatedNotificationId
+                        if (curatedNotificationId == null) {
+                            BubblSdk.emitError(
+                                "notification_missing_curated_id",
+                                "Survey response requires a curated notification id."
+                            )
+                            isEnabled = true
+                            return@launch
+                        }
                         BubblSdk.submitSurveyResponse(
                             BubblSurveyResponse(
-                                curatedNotificationId = payload.curatedNotificationId ?: payload.id,
+                                curatedNotificationId = curatedNotificationId,
                                 locationId = payload.locationId,
                                 answers = answers.values.map { answer -> answer() }
                             )
@@ -251,9 +313,34 @@ public class BubblNotificationActivity : Activity() {
             })
         }
 
-        return ScrollView(this).apply {
+        val scrollView = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
             addView(container)
         }
+
+        root.addView(scrollView)
+
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val safeInsets = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            view.setPadding(
+                safeInsets.left,
+                safeInsets.top + dp(8),
+                safeInsets.right,
+                safeInsets.bottom + dp(8)
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(root)
+
+        return root
     }
 
     private fun openUrl(url: String) {
@@ -261,9 +348,41 @@ public class BubblNotificationActivity : Activity() {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
         }
     }
+
+    private fun launchHostApp(payload: BubblNotificationPayload, action: String?) {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        launchIntent.putExtra("bubbl_notification_id", payload.id)
+        launchIntent.putExtra("bubbl_curated_notification_id", payload.curatedNotificationId)
+        launchIntent.putExtra("bubbl_location_id", payload.locationId)
+        launchIntent.putExtra(BubblNotificationPayloadCodec.extraHandledByHost, true)
+        payload.cta?.url?.let { launchIntent.putExtra("bubbl_cta_url", it) }
+        payload.cta?.action?.let { launchIntent.putExtra("bubbl_cta_action", it) }
+        BubblNotificationPayloadCodec.addToIntent(launchIntent, payload, action)
+        runCatching { startActivity(launchIntent) }
+    }
 }
 
 internal object BubblNotificationPayloadParser {
+    fun fromFirebaseIntent(intent: Intent): BubblNotificationPayload? {
+        val extras = intent.extras ?: return null
+        val payload = mutableMapOf<String, String>()
+        extras.keySet().forEach { key ->
+            @Suppress("DEPRECATION")
+            val value = extras.get(key)
+            if (value != null) {
+                payload[key] = value.toString()
+            }
+        }
+
+        return fromFirebasePayload(
+            payload = payload,
+            messageId = payload["google.message_id"] ?: payload["gcm.message_id"] ?: payload["message_id"],
+            notificationTitle = payload["gcm.n.title"] ?: payload["gcm.notification.title"],
+            notificationBody = payload["gcm.n.body"] ?: payload["gcm.notification.body"]
+        )
+    }
+
     fun fromFirebasePayload(
         payload: Map<String, String>,
         messageId: String? = null,
@@ -294,9 +413,26 @@ internal object BubblNotificationPayloadParser {
         notificationBody: String? = null
     ): BubblNotificationPayload? {
         val data = payload
-        val parsedTitle = firstPresent(data, "title", "headline", "notification_title", "notificationTitle")
+        val parsedTitle = firstPresent(
+            data,
+            "title",
+            "headline",
+            "notification_title",
+            "notificationTitle",
+            "gcm.n.title",
+            "gcm.notification.title"
+        )
             ?: notificationTitle
-        val parsedBody = firstPresent(data, "body", "message", "notification_body", "notificationBody", "description")
+        val parsedBody = firstPresent(
+            data,
+            "body",
+            "message",
+            "notification_body",
+            "notificationBody",
+            "description",
+            "gcm.n.body",
+            "gcm.notification.body"
+        )
             ?: notificationBody
 
         if (parsedTitle.isNullOrBlank() && parsedBody.isNullOrBlank()) {
@@ -311,11 +447,23 @@ internal object BubblNotificationPayloadParser {
             "curated_notification_id",
             "curatedNotificationId",
             "curated_notification",
-            "notification_id",
-            "notificationId"
+            "curatedNotification",
+            "n_id",
+            "nId"
         )
         val locationId = firstPresent(data, "location_id", "locationId", "locationID")
-        val id = firstPresent(data, "id", "message_id", "messageId", "push_id", "pushId")
+        val id = firstPresent(
+            data,
+            "id",
+            "message_id",
+            "messageId",
+            "push_id",
+            "pushId",
+            "notification_id",
+            "notificationId",
+            "gcm.message_id",
+            "google.message_id"
+        )
             ?: curatedNotificationId
             ?: messageId
             ?: stableId(title, body, curatedNotificationId, locationId)
@@ -356,7 +504,18 @@ internal object BubblNotificationPayloadParser {
     }
 
     private fun mediaFrom(data: Map<String, String>): BubblNotificationMedia? {
-        val url = firstPresent(data, "media_url", "mediaUrl", "image", "image_url", "imageUrl", "picture", "pictureUrl")
+        val url = firstPresent(
+            data,
+            "media_url",
+            "mediaUrl",
+            "image",
+            "image_url",
+            "imageUrl",
+            "picture",
+            "pictureUrl",
+            "gcm.n.image",
+            "gcm.notification.image"
+        )
             ?: return null
 
         return BubblNotificationMedia(
@@ -536,6 +695,8 @@ internal object BubblRuntimeNotificationExtractor {
 internal object BubblNotificationPayloadCodec {
     const val extraPayload = "tech.bubbl.sdk.extra.NOTIFICATION_PAYLOAD"
     const val extraAction = "tech.bubbl.sdk.extra.NOTIFICATION_ACTION"
+    const val extraHandledByHost = "tech.bubbl.sdk.extra.NOTIFICATION_HANDLED_BY_HOST"
+    const val extraForceDefaultModal = "tech.bubbl.sdk.extra.FORCE_DEFAULT_MODAL"
     const val actionDefault = "default"
     const val actionCta = "cta"
 

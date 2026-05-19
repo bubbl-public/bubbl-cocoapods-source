@@ -63,10 +63,11 @@ public struct URLSessionBubblHTTPTransport: BubblHTTPTransport {
 }
 
 enum BubblTransportMap {
-    static let sdkVersion = "3.0.0-beta.1"
+    static let sdkVersion = "3.0.0"
     static let platform = "ios"
 
     static let runtimeAuthHeader = "x-api-key"
+    static let ingestAuthHeader = "ApiKey"
     static let dashboardAuthHeader = "ApiKey"
 
     static let refreshGeofencePath = "/api/check-geofence"
@@ -80,19 +81,23 @@ enum BubblTransportMap {
     static let submitSurveyResponsePath = "/api/survey-response"
     static let trackGeofenceBatchPath = "/api/geofence-data"
 
-    static func runtimeBaseURL(_ config: BubblConfig) -> URL {
-        if let url = config.runtimeBaseUrl {
+    static func transmissionBaseURL(_ config: BubblConfig) -> URL {
+        if let url = config.transmissionBaseUrl ?? config.runtimeBaseUrl {
             return url
         }
 
         switch config.environment {
         case .development, .nightly:
-            return URL(string: "https://nightly.api.bubbl.tech")!
+            return URL(string: "https://nightly.transmission.bubbl.tech")!
         case .staging:
-            return URL(string: "https://staging.api.bubbl.tech")!
+            return URL(string: "https://staging.transmission.bubbl.tech")!
         case .production:
-            return URL(string: "https://production.api.bubbl.tech")!
+            return URL(string: "https://transmission.bubbl.tech")!
         }
+    }
+
+    static func runtimeBaseURL(_ config: BubblConfig) -> URL {
+        transmissionBaseURL(config)
     }
 
     static func ingestBaseURL(_ config: BubblConfig) -> URL {
@@ -102,11 +107,11 @@ enum BubblTransportMap {
 
         switch config.environment {
         case .development, .nightly:
-            return URL(string: "https://nightly-platform.bubbl.tech")!
+            return URL(string: "https://nightly.ingest.bubbl.tech")!
         case .staging:
-            return URL(string: "https://staging-platform.bubbl.tech")!
+            return URL(string: "https://staging.ingest.bubbl.tech")!
         case .production:
-            return URL(string: "https://platform.bubbl.tech")!
+            return URL(string: "https://ingest.bubbl.tech")!
         }
     }
 

@@ -191,6 +191,18 @@ final class BubblSdk: RCTEventEmitter {
         }
     }
 
+    @objc(setDefaultNotificationModalEnabled:resolver:rejecter:)
+    func setDefaultNotificationModalEnabled(
+        _ enabled: Bool,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        resolveAsync(resolve, reject) {
+            try await self.sdk.setDefaultNotificationModalEnabled(enabled)
+            return nil
+        }
+    }
+
     @objc(registerPushToken:resolver:rejecter:)
     func registerPushToken(
         _ token: NSString,
@@ -246,6 +258,18 @@ final class BubblSdk: RCTEventEmitter {
         resolveAsync(resolve, reject) {
             try await self.sdk.handleNotificationOpen(try payload.swiftMap.notificationPayload(), action: action as String?)
             return nil
+        }
+    }
+
+    @objc(openNotificationModal:action:resolver:rejecter:)
+    func openNotificationModal(
+        _ payload: NSDictionary,
+        action: NSString?,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        resolveAsync(resolve, reject) {
+            try await self.sdk.openNotificationModal(try payload.swiftMap.notificationPayload(), action: action as String?)
         }
     }
 
@@ -416,6 +440,7 @@ private extension Dictionary where Key == String, Value == Any {
             apiKey: try requiredString("apiKey"),
             environment: BubblEnvironment(rawValue: string("environment") ?? "staging") ?? .staging,
             runtimeBaseUrl: string("runtimeBaseUrl").flatMap(URL.init(string:)),
+            transmissionBaseUrl: string("transmissionBaseUrl").flatMap(URL.init(string:)),
             ingestBaseUrl: string("ingestBaseUrl").flatMap(URL.init(string:)),
             segments: stringArray("segments"),
             correlationId: string("correlationId"),
@@ -536,7 +561,8 @@ private extension BubblDiagnostics {
             "sdkVersion": sdkVersion,
             "platform": platform,
             "booted": booted,
-            "pendingIngestCount": pendingIngestCount
+            "pendingIngestCount": pendingIngestCount,
+            "pushTokenSuffix": reactValue(pushTokenSuffix)
         ]
     }
 }

@@ -4,7 +4,7 @@ This canary app depends on the local `../../ios` Swift Package and proves the v3
 
 The canary flow covers:
 
-- `boot(config)` queues renewed Dashboard legacy-mirrored ingest.
+- `boot(config)` queues renewed Ingest service telemetry.
 - `track(event)` and push-token registration enqueue durable ingest.
 - `getConfiguration()` uses URLSession, writes runtime cache, and falls back to cache when runtime goes offline.
 - Failed ingest flush leaves the SQLite queue intact.

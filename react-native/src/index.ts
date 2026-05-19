@@ -14,6 +14,7 @@ export type BubblConfig = {
   apiKey: string;
   environment?: BubblEnvironment;
   runtimeBaseUrl?: string | null;
+  transmissionBaseUrl?: string | null;
   ingestBaseUrl?: string | null;
   segments?: string[];
   correlationId?: string | null;
@@ -149,6 +150,7 @@ export type BubblDiagnostics = {
   platform: 'react-native';
   booted: boolean;
   pendingIngestCount: number;
+  pushTokenSuffix?: string | null;
 };
 
 export type BubblEvent =
@@ -232,6 +234,15 @@ export const Bubbl = {
   async clearCorrelationId(): Promise<void> {
     return nativeModule().clearCorrelationId();
   },
+  async setDefaultNotificationModalEnabled(enabled: boolean): Promise<void> {
+    return nativeModule().setDefaultNotificationModalEnabled(enabled);
+  },
+  async disableDefaultNotificationModal(): Promise<void> {
+    return nativeModule().setDefaultNotificationModalEnabled(false);
+  },
+  async enableDefaultNotificationModal(): Promise<void> {
+    return nativeModule().setDefaultNotificationModalEnabled(true);
+  },
   async registerPushToken(token: string): Promise<void> {
     return nativeModule().registerPushToken(token);
   },
@@ -246,6 +257,9 @@ export const Bubbl = {
   },
   async handleNotificationOpen(payload: BubblNotificationPayload, action?: string | null): Promise<void> {
     return nativeModule().handleNotificationOpen(payload, action);
+  },
+  async openNotificationModal(payload: BubblNotificationPayload, action?: string | null): Promise<boolean> {
+    return nativeModule().openNotificationModal(payload, action);
   },
   async handleNotificationCta(payload: BubblNotificationPayload, action?: string | null): Promise<void> {
     return nativeModule().handleNotificationCta(payload, action);

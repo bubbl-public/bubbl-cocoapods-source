@@ -60,10 +60,11 @@ class UrlConnectionBubblHttpTransport : BubblHttpTransport {
 }
 
 internal object BubblTransportMap {
-    const val sdkVersion = "3.0.0-beta.1"
+    const val sdkVersion = "3.0.0"
     const val platform = "android"
 
     const val runtimeAuthHeader = "x-api-key"
+    const val ingestAuthHeader = "ApiKey"
     const val dashboardAuthHeader = "ApiKey"
 
     const val refreshGeofencePath = "/api/check-geofence"
@@ -77,20 +78,22 @@ internal object BubblTransportMap {
     const val submitSurveyResponsePath = "/api/survey-response"
     const val trackGeofenceBatchPath = "/api/geofence-data"
 
-    fun runtimeBaseUrl(config: BubblConfig): String =
-        config.runtimeBaseUrl ?: when (config.environment) {
+    fun transmissionBaseUrl(config: BubblConfig): String =
+        config.transmissionBaseUrl ?: config.runtimeBaseUrl ?: when (config.environment) {
             BubblEnvironment.Development,
-            BubblEnvironment.Nightly -> "https://nightly.api.bubbl.tech"
-            BubblEnvironment.Staging -> "https://staging.api.bubbl.tech"
-            BubblEnvironment.Production -> "https://production.api.bubbl.tech"
+            BubblEnvironment.Nightly -> "https://nightly.transmission.bubbl.tech"
+            BubblEnvironment.Staging -> "https://staging.transmission.bubbl.tech"
+            BubblEnvironment.Production -> "https://transmission.bubbl.tech"
         }
+
+    fun runtimeBaseUrl(config: BubblConfig): String = transmissionBaseUrl(config)
 
     fun ingestBaseUrl(config: BubblConfig): String =
         config.ingestBaseUrl ?: when (config.environment) {
             BubblEnvironment.Development,
-            BubblEnvironment.Nightly -> "https://nightly-platform.bubbl.tech"
-            BubblEnvironment.Staging -> "https://staging-platform.bubbl.tech"
-            BubblEnvironment.Production -> "https://platform.bubbl.tech"
+            BubblEnvironment.Nightly -> "https://nightly.ingest.bubbl.tech"
+            BubblEnvironment.Staging -> "https://staging.ingest.bubbl.tech"
+            BubblEnvironment.Production -> "https://ingest.bubbl.tech"
         }
 
     fun transmissionDistanceMiles(publicDistanceMeters: Int): Double =

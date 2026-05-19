@@ -31,34 +31,42 @@ function assertArray(value, label) {
 const transportMap = readJson('contracts/transport-map.json');
 const openApi = fs.readFileSync(path.join(root, 'contracts/openapi.yaml'), 'utf8');
 
-assert(transportMap.contractVersion === '3.0.0-beta.1', 'unexpected contract version');
-assert(transportMap.ingest.registerDevice.path === '/api/device-registerd/create', 'Dashboard ingest must mirror legacy device path');
-assert(transportMap.ingest.bootBatch.path === '/api/device-data', 'Dashboard ingest must mirror legacy device-data path');
-assert(transportMap.ingest.trackGeofenceBatch.path === '/api/geofence-data', 'Dashboard ingest must mirror legacy geofence-data path');
-assert(transportMap.ingest.trackEvent.path === '/api/activities', 'Dashboard ingest must mirror legacy activities path');
-assert(transportMap.ingest.updateSegments.path === '/api/segments', 'Dashboard ingest must mirror legacy segments path');
-assert(transportMap.ingest.submitSurveyResponse.path === '/api/survey-response', 'Dashboard ingest must mirror legacy survey path');
+assert(transportMap.contractVersion === '3.0.0', 'unexpected contract version');
+assert(transportMap.ingest.registerDevice.path === '/api/device-registerd/create', 'Ingest service must keep the SDK device path');
+assert(transportMap.ingest.bootBatch.path === '/api/device-data', 'Ingest service must keep the SDK device-data path');
+assert(transportMap.ingest.trackGeofenceBatch.path === '/api/geofence-data', 'Ingest service must keep the SDK geofence-data path');
+assert(transportMap.ingest.trackEvent.path === '/api/activities', 'Ingest service must keep the SDK activities path');
+assert(transportMap.ingest.updateSegments.path === '/api/segments', 'Ingest service must keep the SDK segments path');
+assert(transportMap.ingest.submitSurveyResponse.path === '/api/survey-response', 'Ingest service must keep the SDK survey path');
 assert(transportMap.runtime.refreshGeofence.publicDistanceUnit === 'meters', 'refreshGeofence public distance unit must be meters');
 assert(transportMap.runtime.refreshGeofence.wireDistanceUnit === 'miles', 'refreshGeofence Transmission v2 wire distance unit must be miles');
 assert(transportMap.runtime.refreshGeofence.wireShape === 'legacy-transmission-v2', 'refreshGeofence must document Transmission v2 wire compatibility');
 
 const expectedEnvironmentUrls = {
-  development: ['https://nightly.api.bubbl.tech', 'https://nightly-platform.bubbl.tech'],
-  nightly: ['https://nightly.api.bubbl.tech', 'https://nightly-platform.bubbl.tech'],
-  staging: ['https://staging.api.bubbl.tech', 'https://staging-platform.bubbl.tech'],
-  production: ['https://production.api.bubbl.tech', 'https://platform.bubbl.tech']
+  development: ['https://nightly.api.bubbl.tech', 'https://nightly.transmission.bubbl.tech', 'https://nightly.ingest.bubbl.tech'],
+  nightly: ['https://nightly.api.bubbl.tech', 'https://nightly.transmission.bubbl.tech', 'https://nightly.ingest.bubbl.tech'],
+  staging: ['https://staging.api.bubbl.tech', 'https://staging.transmission.bubbl.tech', 'https://staging.ingest.bubbl.tech'],
+  production: ['https://api.bubbl.tech', 'https://transmission.bubbl.tech', 'https://ingest.bubbl.tech']
 };
 
-for (const [environment, [runtimeBaseUrl, ingestBaseUrl]] of Object.entries(expectedEnvironmentUrls)) {
+for (const [environment, [platformApiBaseUrl, transmissionBaseUrl, ingestBaseUrl]] of Object.entries(expectedEnvironmentUrls)) {
   assert(
-    transportMap.environments?.[environment]?.runtimeBaseUrl === runtimeBaseUrl,
-    `${environment} runtimeBaseUrl must mirror legacy SDK endpoint`
+    transportMap.environments?.[environment]?.platformApiBaseUrl === platformApiBaseUrl,
+    `${environment} platformApiBaseUrl must use the renewed api host`
+  );
+  assert(
+    transportMap.environments?.[environment]?.transmissionBaseUrl === transmissionBaseUrl,
+    `${environment} transmissionBaseUrl must use the renewed transmission host`
+  );
+  assert(
+    transportMap.environments?.[environment]?.runtimeBaseUrl === transmissionBaseUrl,
+    `${environment} runtimeBaseUrl must remain a transmission alias`
   );
   assert(
     transportMap.environments?.[environment]?.ingestBaseUrl === ingestBaseUrl,
-    `${environment} ingestBaseUrl must mirror legacy SDK endpoint`
+    `${environment} ingestBaseUrl must use the renewed ingest host`
   );
-  assert(openApi.includes(`  - url: ${runtimeBaseUrl}`), `OpenAPI missing ${environment} runtime server ${runtimeBaseUrl}`);
+  assert(openApi.includes(`  - url: ${transmissionBaseUrl}`), `OpenAPI missing ${environment} transmission server ${transmissionBaseUrl}`);
   assert(openApi.includes(`  - url: ${ingestBaseUrl}`), `OpenAPI missing ${environment} ingest server ${ingestBaseUrl}`);
 }
 

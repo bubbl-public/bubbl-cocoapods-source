@@ -2,7 +2,9 @@
 
 This repository is the source of truth for the Bubbl SDK v3 contract and implementation family.
 
-The SDK public API is clean and platform-neutral, while the first renewed Dashboard ingest transport intentionally mirrors the legacy Dashboard paths:
+The SDK public API is clean and platform-neutral. Runtime reads go to the Transmission service, telemetry writes go to the Ingest service, and platform/account operations belong on the Platform API.
+
+The renewed Ingest transport intentionally keeps the existing SDK path shapes:
 
 - `POST /api/device-registerd/create`
 - `POST /api/device-data`
@@ -17,14 +19,14 @@ Transmission runtime reads remain on the existing SDK runtime paths:
 - `GET /api/check-push`
 - `GET /api/get-config`
 
-Environment defaults mirror the legacy SDKs:
+Environment defaults follow the renewed service split:
 
-| Environment | Runtime | Ingest |
-| --- | --- | --- |
-| `development` | `https://nightly.api.bubbl.tech` | `https://nightly-platform.bubbl.tech` |
-| `nightly` | `https://nightly.api.bubbl.tech` | `https://nightly-platform.bubbl.tech` |
-| `staging` | `https://staging.api.bubbl.tech` | `https://staging-platform.bubbl.tech` |
-| `production` | `https://production.api.bubbl.tech` | `https://platform.bubbl.tech` |
+| Environment | Platform API | Transmission | Ingest |
+| --- | --- | --- | --- |
+| `development` | `https://nightly.api.bubbl.tech` | `https://nightly.transmission.bubbl.tech` | `https://nightly.ingest.bubbl.tech` |
+| `nightly` | `https://nightly.api.bubbl.tech` | `https://nightly.transmission.bubbl.tech` | `https://nightly.ingest.bubbl.tech` |
+| `staging` | `https://staging.api.bubbl.tech` | `https://staging.transmission.bubbl.tech` | `https://staging.ingest.bubbl.tech` |
+| `production` | `https://api.bubbl.tech` | `https://transmission.bubbl.tech` | `https://ingest.bubbl.tech` |
 
 The public SDK distance setting is meters. The current Transmission v2
 `/api/check-geofence` wire parameter is still interpreted as miles, so the
@@ -48,7 +50,7 @@ docs/           Runtime strategy notes
 This is the beta candidate foundation:
 
 - Contract schemas and golden fixtures are present.
-- Transport mapping records that Dashboard ingest uses legacy-mirrored paths, Transmission runtime uses legacy SDK environment endpoints, and public meter distances are converted for the current Transmission v2 wire unit.
+- Transport mapping records that Ingest uses SDK-compatible paths, Transmission runtime uses the renewed split hosts, Platform API hosts are listed for app/account clients, and public meter distances are converted for the current Transmission v2 wire unit.
 - Android implements runtime networking, DataStore-backed state/cache, Room-backed durable ingest, geofence transition state, WorkManager background flush/refresh with last-known-location geofence refresh, and an opted-in foreground location service.
 - iOS implements runtime networking, Keychain-backed secure state, SQLite-backed durable ingest, file-backed runtime cache fallback, geofence transition state, a CoreLocation monitor helper, and background circular-region selection capped to the nearest 20 geofences.
 - The iOS Swift package product remains `BubblSDK`; the public client type is `BubblClient` so release builds can generate stable Swift interfaces and XCFramework artifacts without a module/type name collision.

@@ -147,6 +147,12 @@ public final actor BubblClient {
         try saveState(activeState)
     }
 
+    public func setDefaultNotificationModalEnabled(_ enabled: Bool) async throws {
+        var nextConfig = try requireConfig()
+        nextConfig.enableDefaultNotificationModal = enabled
+        config = nextConfig
+    }
+
     public func registerPushToken(_ token: String) async throws {
         let activeConfig = try requireConfig()
         var activeState = try requireState()
@@ -185,25 +191,43 @@ public final actor BubblClient {
     }
 
     public func showNotification(_ payload: BubblNotificationPayload) async throws -> BubblNotificationDisplayResult {
-        streamContinuation.yield(.notificationReceived(payload))
-        return try await renderDefaultNotification(payload)
+        try await recordNotificationReceived(payload)
+        do {
+            let result = try await renderDefaultNotification(payload)
+            await flushNotificationTelemetry()
+            return result
+        } catch {
+            await flushNotificationTelemetry()
+            throw error
+        }
     }
 
     public func handleNotificationPayload(_ payload: BubblNotificationPayload) async throws -> BubblNotificationDisplayResult {
         let activeConfig = try requireConfig()
-        streamContinuation.yield(.notificationReceived(payload))
+        try await recordNotificationReceived(payload)
 
-        guard activeConfig.enablePushHandling else {
-            return BubblNotificationDisplayResult(displayed: false, reason: "push_handling_disabled")
-        }
+        do {
+            let result: BubblNotificationDisplayResult
+            guard activeConfig.enablePushHandling else {
+                result = BubblNotificationDisplayResult(displayed: false, reason: "push_handling_disabled")
+                await flushNotificationTelemetry()
+                return result
+            }
 
-        switch activeConfig.notificationRenderingMode {
-        case .sdkDefault:
-            return try await renderDefaultNotification(payload)
-        case .hostRendered:
-            return BubblNotificationDisplayResult(displayed: false, reason: "host_rendered")
-        case .eventOnly:
-            return BubblNotificationDisplayResult(displayed: false, reason: "event_only")
+            switch activeConfig.notificationRenderingMode {
+            case .sdkDefault:
+                result = try await renderDefaultNotification(payload)
+            case .hostRendered:
+                result = BubblNotificationDisplayResult(displayed: false, reason: "host_rendered")
+            case .eventOnly:
+                result = BubblNotificationDisplayResult(displayed: false, reason: "event_only")
+            }
+
+            await flushNotificationTelemetry()
+            return result
+        } catch {
+            await flushNotificationTelemetry()
+            throw error
         }
     }
 
@@ -246,6 +270,24 @@ public final actor BubblClient {
         try await track(notificationInteractionEvent(payload, activity: "notification_opened"))
     }
 
+    public func openNotificationModal(_ payload: BubblNotificationPayload, action: String? = nil) async throws -> Bool {
+        _ = try requireConfig()
+
+        #if os(iOS)
+        let presented = await BubblNotificationModalPresenter.present(payload, sdk: self)
+        guard presented else {
+            streamContinuation.yield(.error(code: "notification_modal_open_failed", message: "No foreground view controller was available."))
+            return false
+        }
+
+        try await handleNotificationOpen(payload, action: action)
+        return true
+        #else
+        streamContinuation.yield(.error(code: "notification_modal_open_failed", message: "Default notification modal is only available on iOS."))
+        return false
+        #endif
+    }
+
     public func handleNotificationCTA(_ payload: BubblNotificationPayload, action: String? = nil) async throws {
         _ = try requireConfig()
         streamContinuation.yield(.notificationCtaTapped(payload, action: action ?? payload.cta?.action))
@@ -267,17 +309,31 @@ public final actor BubblClient {
 
     public func track(_ event: BubblTrackEvent) async throws {
         let activeState = try requireState()
+        guard let dashboardActivity = dashboardActivityName(event.activity) else {
+            return
+        }
         var payload: [String: Any] = [
             "device_registered_id": activeState.installId,
             "type": event.type,
-            "activity": event.activity,
+            "activity": dashboardActivity,
             "time": isoNow()
         ]
 
         if let locationId = intString(event.locationId) {
             payload["location_id"] = locationId
         }
-        if let curatedNotificationId = intString(event.curatedNotificationId) {
+        if event.type == "notification" {
+            guard let value = event.curatedNotificationId, let curatedNotificationId = Int(value) else {
+                streamContinuation.yield(
+                    .error(
+                        code: "notification_missing_curated_id",
+                        message: "Notification analytics require a Dashboard curated notification id."
+                    )
+                )
+                return
+            }
+            payload["curated_notification_id"] = curatedNotificationId
+        } else if let value = event.curatedNotificationId, let curatedNotificationId = Int(value) {
             payload["curated_notification_id"] = curatedNotificationId
         }
         if let latitude = event.latitude {
@@ -328,7 +384,15 @@ public final actor BubblClient {
 
             try store.saveQueue(remaining)
             let result = BubblFlushResult(pendingCount: remaining.count)
-            streamContinuation.yield(.diagnostic(BubblDiagnostics(booted: booted, pendingIngestCount: remaining.count)))
+            streamContinuation.yield(
+                .diagnostic(
+                    BubblDiagnostics(
+                        booted: booted,
+                        pendingIngestCount: remaining.count,
+                        pushTokenSuffix: pushTokenSuffix(state?.pushToken)
+                    )
+                )
+            )
             return result
         } catch {
             streamContinuation.yield(.error(code: "ingest_queue_failed", message: String(describing: error)))
@@ -337,7 +401,21 @@ public final actor BubblClient {
     }
 
     public func diagnostics() async -> BubblDiagnostics {
-        BubblDiagnostics(booted: booted, pendingIngestCount: (try? store.pendingCount()) ?? 0)
+        let storedPushToken = state?.pushToken ?? (try? store.loadState())?.pushToken
+        return BubblDiagnostics(
+            booted: booted,
+            pendingIngestCount: (try? store.pendingCount()) ?? 0,
+            pushTokenSuffix: pushTokenSuffix(storedPushToken)
+        )
+    }
+
+    private func pushTokenSuffix(_ token: String?) -> String? {
+        guard let token = token?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !token.isEmpty else {
+            return nil
+        }
+
+        return String(token.suffix(7))
     }
 
     private func renderDefaultNotification(_ payload: BubblNotificationPayload) async throws -> BubblNotificationDisplayResult {
@@ -381,6 +459,15 @@ public final actor BubblClient {
         )
     }
 
+    private func recordNotificationReceived(_ payload: BubblNotificationPayload) async throws {
+        streamContinuation.yield(.notificationReceived(payload))
+        try await track(notificationSentEvent(payload))
+    }
+
+    private func flushNotificationTelemetry() async {
+        _ = await flush()
+    }
+
     private func processGeofenceRuntime(_ data: Data, location: BubblLocation) async throws {
         let state = try loadGeofenceState()
         let evaluation = BubblGeofenceEngine.evaluate(
@@ -420,7 +507,7 @@ public final actor BubblClient {
         let activeState = try requireState()
         let request = BubblHTTPRequest(
             method: method,
-            url: endpointURL(base: BubblTransportMap.runtimeBaseURL(activeConfig), path: path),
+            url: endpointURL(base: BubblTransportMap.transmissionBaseURL(activeConfig), path: path),
             headers: headers(authHeader: BubblTransportMap.runtimeAuthHeader, config: activeConfig, state: activeState),
             body: body
         )
@@ -443,7 +530,7 @@ public final actor BubblClient {
     private func sendIngest(_ entry: BubblQueuedRequest) async throws {
         let activeConfig = try requireConfig()
         let activeState = try requireState()
-        var requestHeaders = headers(authHeader: BubblTransportMap.dashboardAuthHeader, config: activeConfig, state: activeState)
+        var requestHeaders = headers(authHeader: BubblTransportMap.ingestAuthHeader, config: activeConfig, state: activeState)
         requestHeaders["Idempotency-Key"] = entry.idempotencyKey
 
         let request = BubblHTTPRequest(
@@ -611,6 +698,15 @@ public final actor BubblClient {
         )
     }
 
+    private func notificationSentEvent(_ payload: BubblNotificationPayload) -> BubblTrackEvent {
+        BubblTrackEvent(
+            type: "notification",
+            activity: "notification_sent",
+            locationId: payload.locationId,
+            curatedNotificationId: payload.curatedNotificationId
+        )
+    }
+
     private func notificationInteractionEvent(_ payload: BubblNotificationPayload, activity: String) -> BubblTrackEvent {
         BubblTrackEvent(
             type: "notification",
@@ -635,7 +731,7 @@ public final actor BubblClient {
         let transition = dispatch.transition
         let payload = dispatch.payload
 
-        guard let notificationId = Int(payload.curatedNotificationId ?? payload.id),
+        guard let notificationId = payload.curatedNotificationId.flatMap(Int.init),
               let locationId = Int(transition.locationId ?? payload.locationId ?? "") else {
             return
         }
@@ -707,6 +803,23 @@ private func normalizeJSON(_ value: Any) -> Any {
 private func intString(_ value: String?) -> Any? {
     guard let value else { return nil }
     return Int(value) ?? value
+}
+
+private func dashboardActivityName(_ activity: String) -> String? {
+    switch activity {
+    case "notification_cta_tapped",
+         "cta_engagement":
+        return "cta_engagment"
+    case "notification_media_viewed":
+        return "media_viewed"
+    case "notification_dismissed":
+        return "dismissed"
+    case "notification_opened",
+         "notification_survey_requested":
+        return nil
+    default:
+        return activity
+    }
 }
 
 private func endpointURL(base: URL, path: String) -> URL {

@@ -4,6 +4,7 @@ data class BubblConfig(
     val apiKey: String,
     val environment: BubblEnvironment = BubblEnvironment.Staging,
     val runtimeBaseUrl: String? = null,
+    val transmissionBaseUrl: String? = null,
     val ingestBaseUrl: String? = null,
     val segments: List<String> = emptyList(),
     val correlationId: String? = null,
@@ -20,6 +21,7 @@ data class BubblConfig(
 enum class BubblEnvironment { Development, Nightly, Staging, Production }
 enum class BubblLogLevel { Off, Error, Warn, Info, Debug }
 enum class BubblNotificationRenderingMode { SdkDefault, HostRendered, EventOnly }
+enum class BubblNotificationTapPresentation { Auto, DefaultModal, HostModal }
 enum class BubblNotificationSource { Firebase, Apns, Runtime, Geofence, Manual }
 
 data class BubblBootResult(
@@ -148,13 +150,19 @@ data class BubblNotificationDisplayResult(
     val reason: String? = null
 )
 
+data class BubblNotificationTap(
+    val payload: BubblNotificationPayload,
+    val action: String? = null
+)
+
 data class BubblFlushResult(val pendingCount: Int)
 
 data class BubblDiagnostics(
-    val sdkVersion: String = "3.0.0-beta.1",
+    val sdkVersion: String = "3.0.0",
     val platform: String = "android",
     val booted: Boolean = false,
-    val pendingIngestCount: Int = 0
+    val pendingIngestCount: Int = 0,
+    val pushTokenSuffix: String? = null
 )
 
 sealed interface BubblEvent {

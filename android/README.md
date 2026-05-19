@@ -5,15 +5,15 @@ Android v3 is a native Kotlin SDK. The native layer owns runtime reads, local ca
 Initial transport target:
 
 - Runtime: Transmission `/api/check-geofence`, `/api/check-push`, `/api/get-config`
-- Ingest: renewed Dashboard legacy-mirrored paths documented in `../contracts/transport-map.json`
-- Environment defaults mirror the legacy Android/iOS SDKs. `Development` and `Nightly` use nightly endpoints, `Staging` uses staging endpoints, and `Production` uses `https://production.api.bubbl.tech` for Transmission plus `https://platform.bubbl.tech` for ingest.
+- Ingest: renewed Ingest SDK-compatible paths documented in `../contracts/transport-map.json`
+- Environment defaults follow the renewed split hosts. `Development` and `Nightly` use `nightly.*`, `Staging` uses `staging.*`, and `Production` uses `https://transmission.bubbl.tech` for Transmission plus `https://ingest.bubbl.tech` for ingest.
 - `defaultDistanceMeters` stays public in meters; the Android transport converts it to the current Transmission v2 wire distance unit before calling `/api/check-geofence`.
 
 The alpha runtime has real transport and Android persistence wiring behind the stable public facade:
 
 - `boot(config)` persists install state and queues `/api/device-data`.
 - `refreshGeofence(location)`, `refreshPush()`, and `getConfiguration()` call Transmission and cache successful responses.
-- `track(event)`, `updateSegments(tags)`, `registerPushToken(token)`, and `submitSurveyResponse(response)` append durable Dashboard ingest writes.
+- `track(event)`, `updateSegments(tags)`, `registerPushToken(token)`, and `submitSurveyResponse(response)` append durable Ingest service writes.
 - `flush()` drains the persisted ingest queue and leaves failed writes queued with incremented attempts.
 - DataStore stores install state, active config, runtime cache, segments, correlation ID, and push token.
 - Room stores the durable ingest queue.
@@ -27,8 +27,11 @@ The alpha runtime has real transport and Android persistence wiring behind the s
 - When `enableLocationTracking` is enabled, the periodic WorkManager refresh tries the device's last known location for background-safe geofence refreshes.
 - Native device notifications are rendered by default when `enablePushHandling = true` and `notificationRenderingMode = SdkDefault`.
 - Notification taps route through `BubblNotificationActivity`, which provides a default detail/survey UI.
+- Firebase auto-rendered notification taps can be forwarded from the launcher activity with `BubblSdk.openNotificationIntent(activity, intent)`.
+- In-app notification inbox/history rows can open the bundled detail/survey UI with `BubblSdk.openNotificationModal(context, payload)` without posting another device notification.
+- Apps with custom in-app notification UI can keep native device notifications enabled and disable only the bundled detail UI with `enableDefaultNotificationModal = false` or `BubblSdk.setDefaultNotificationModalEnabled(false)`.
 - Delivered/opened/CTA/media/survey-requested notification events are queued to `/api/activities`.
-- Geofence entry/exit and location update events are queued to the renewed Dashboard legacy-mirrored ingest paths.
+- Geofence entry/exit and location update events are queued to the renewed Ingest service paths.
 
 Install with an Android `Context` in app code:
 
@@ -58,6 +61,43 @@ override fun onNewToken(token: String) {
         BubblSdk.syncFcmToken(token)
     }
 }
+```
+
+If Firebase launches your app directly from a system notification tap, forward
+the launcher intent before drawing your own UI. Use `DefaultModal` when the SDK
+should show the bundled modal:
+
+```kotlin
+override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    BubblSdk.openNotificationIntent(
+        this,
+        intent,
+        BubblNotificationTapPresentation.DefaultModal
+    )
+}
+
+override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    BubblSdk.openNotificationIntent(
+        this,
+        intent,
+        BubblNotificationTapPresentation.DefaultModal
+    )
+}
+```
+
+Use `HostModal` when the app renders its own modal. The SDK keeps the tap
+payload pending across cold start so the host can drain or receive the
+`NotificationTapped` event once its listener is attached:
+
+```kotlin
+BubblSdk.openNotificationIntent(
+    this,
+    intent,
+    BubblNotificationTapPresentation.HostModal
+)
 ```
 
 Apps that want the bundled foreground location loop can start it after location permission is granted:

@@ -63,6 +63,17 @@ class BubblSdk {
 
   Future<void> clearCorrelationId() => _invokeVoid('clearCorrelationId');
 
+  Future<void> setDefaultNotificationModalEnabled(bool enabled) =>
+      _invokeVoid('setDefaultNotificationModalEnabled', <String, Object?>{
+        'enabled': enabled,
+      });
+
+  Future<void> disableDefaultNotificationModal() =>
+      setDefaultNotificationModalEnabled(false);
+
+  Future<void> enableDefaultNotificationModal() =>
+      setDefaultNotificationModalEnabled(true);
+
   Future<void> registerPushToken(String token) =>
       _invokeVoid('registerPushToken', <String, Object?>{'token': token});
 
@@ -101,6 +112,20 @@ class BubblSdk {
     'payload': payload._toMap(),
     if (action != null) 'action': action,
   });
+
+  Future<bool> openNotificationModal(
+    BubblNotificationPayload payload, {
+    String? action,
+  }) async {
+    final result = await _methods.invokeMethod<bool>(
+      'openNotificationModal',
+      <String, Object?>{
+        'payload': payload._toMap(),
+        if (action != null) 'action': action,
+      },
+    );
+    return result ?? false;
+  }
 
   Future<void> handleNotificationCta(
     BubblNotificationPayload payload, {
@@ -152,6 +177,7 @@ extension on BubblConfig {
     'apiKey': apiKey,
     'environment': environment.name,
     'runtimeBaseUrl': runtimeBaseUrl,
+    'transmissionBaseUrl': transmissionBaseUrl,
     'ingestBaseUrl': ingestBaseUrl,
     'segments': segments,
     'correlationId': correlationId,
@@ -294,10 +320,11 @@ BubblConfiguration _configurationFromMap(Map<String, Object?> map) =>
 
 BubblDiagnostics _diagnosticsFromMap(Map<String, Object?> map) =>
     BubblDiagnostics(
-      sdkVersion: map['sdkVersion']?.toString() ?? '3.0.0-beta.1',
+      sdkVersion: map['sdkVersion']?.toString() ?? '3.0.0',
       platform: map['platform']?.toString() ?? 'flutter',
       booted: _bool(map['booted']),
       pendingIngestCount: _int(map['pendingIngestCount']),
+      pushTokenSuffix: map['pushTokenSuffix']?.toString(),
     );
 
 BubblLocation _locationFromMap(Map<String, Object?> map) => BubblLocation(

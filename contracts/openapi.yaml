@@ -1,26 +1,26 @@
 openapi: 3.1.0
 info:
   title: Bubbl SDK v3 Contract
-  version: 3.0.0-beta.1
+  version: 3.0.0
   description: >
-    SDK v3 public concepts mapped to the current Transmission runtime paths and
-    renewed Dashboard legacy-mirrored ingest paths.
+    SDK v3 public concepts mapped to the renewed Transmission runtime paths and
+    dedicated ingest service paths.
 servers:
-  - url: https://nightly.api.bubbl.tech
+  - url: https://nightly.transmission.bubbl.tech
     description: Transmission nightly runtime
-  - url: https://staging.api.bubbl.tech
+  - url: https://staging.transmission.bubbl.tech
     description: Transmission staging runtime
-  - url: https://production.api.bubbl.tech
+  - url: https://transmission.bubbl.tech
     description: Transmission production runtime
-  - url: https://nightly-platform.bubbl.tech
-    description: Dashboard nightly ingest
-  - url: https://staging-platform.bubbl.tech
-    description: Dashboard staging ingest
-  - url: https://platform.bubbl.tech
-    description: Dashboard production ingest
+  - url: https://nightly.ingest.bubbl.tech
+    description: Ingest nightly
+  - url: https://staging.ingest.bubbl.tech
+    description: Ingest staging
+  - url: https://ingest.bubbl.tech
+    description: Ingest production
 security:
   - RuntimeApiKey: []
-  - DashboardApiKey: []
+  - IngestApiKey: []
 paths:
   /api/check-geofence:
     post:
@@ -81,7 +81,7 @@ paths:
       x-bubbl-sdk-method: registerPushToken
       x-bubbl-wire-shape: legacy-mirrored
       security:
-        - DashboardApiKey: []
+        - IngestApiKey: []
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - $ref: "#/components/parameters/SdkVersion"
@@ -107,7 +107,7 @@ paths:
       x-bubbl-sdk-method: boot
       x-bubbl-wire-shape: legacy-mirrored
       security:
-        - DashboardApiKey: []
+        - IngestApiKey: []
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - $ref: "#/components/parameters/SdkVersion"
@@ -133,7 +133,7 @@ paths:
       x-bubbl-sdk-method: refreshGeofence
       x-bubbl-wire-shape: legacy-mirrored
       security:
-        - DashboardApiKey: []
+        - IngestApiKey: []
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - $ref: "#/components/parameters/SdkVersion"
@@ -159,7 +159,7 @@ paths:
       x-bubbl-sdk-method: track
       x-bubbl-wire-shape: legacy-mirrored
       security:
-        - DashboardApiKey: []
+        - IngestApiKey: []
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - $ref: "#/components/parameters/SdkVersion"
@@ -185,7 +185,7 @@ paths:
       x-bubbl-sdk-method: updateSegments
       x-bubbl-wire-shape: legacy-mirrored
       security:
-        - DashboardApiKey: []
+        - IngestApiKey: []
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - $ref: "#/components/parameters/SdkVersion"
@@ -211,7 +211,7 @@ paths:
       x-bubbl-sdk-method: submitSurveyResponse
       x-bubbl-wire-shape: legacy-mirrored
       security:
-        - DashboardApiKey: []
+        - IngestApiKey: []
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
         - $ref: "#/components/parameters/SdkVersion"
@@ -237,7 +237,7 @@ components:
       type: apiKey
       in: header
       name: x-api-key
-    DashboardApiKey:
+    IngestApiKey:
       type: apiKey
       in: header
       name: ApiKey

@@ -12,11 +12,11 @@ Implemented in the native cores:
 
 - Stable facade: `boot`, `shutdown`, `refresh`, `refreshGeofence`, `refreshPush`, `getConfiguration`, `getPrivacyText`, `updateSegments`, `setCorrelationId`, `clearCorrelationId`, `registerPushToken`, `track`, `submitSurveyResponse`, `flush`, `diagnostics`, `events`.
 - Runtime reads: Transmission `/api/check-geofence`, `/api/check-push`, `/api/get-config`.
-- Renewed Dashboard ingest writes through legacy-mirrored paths.
-- Default endpoint resolution mirrors the legacy SDKs:
-  - `development` and `nightly`: nightly Transmission + nightly Dashboard.
-  - `staging`: staging Transmission + staging Dashboard.
-  - `production`: `production.api.bubbl.tech` Transmission + `platform.bubbl.tech` Dashboard.
+- Renewed Ingest service writes through SDK-compatible paths.
+- Default endpoint resolution uses the renewed split hosts:
+  - `development` and `nightly`: `nightly.transmission.bubbl.tech` + `nightly.ingest.bubbl.tech`.
+  - `staging`: `staging.transmission.bubbl.tech` + `staging.ingest.bubbl.tech`.
+  - `production`: `transmission.bubbl.tech` + `ingest.bubbl.tech`.
 - Public geofence distance remains meters, with native SDKs converting to the current Transmission v2 wire distance unit before calling `/api/check-geofence`.
 - Durable ingest queue:
   - Android: Room.

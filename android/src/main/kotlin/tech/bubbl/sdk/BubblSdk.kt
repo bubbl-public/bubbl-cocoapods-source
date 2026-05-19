@@ -1,17 +1,31 @@
 package tech.bubbl.sdk
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.os.Build
+import android.util.Log
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.time.Instant
 import java.util.Locale
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 object BubblSdk {
+    private const val logTag = "BubblSdk"
     private val eventBus = MutableSharedFlow<BubblEvent>(extraBufferCapacity = 64)
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var transport: BubblHttpTransport = UrlConnectionBubblHttpTransport()
     private var store: BubblStore = FileBubblStore(defaultStorageDirectory())
     private var appContext: Context? = null
@@ -19,6 +33,8 @@ object BubblSdk {
     private var state: BubblStoredState? = null
     private var booted: Boolean = false
     private var cachedConfiguration: BubblConfiguration? = null
+    private val pendingNotificationTapLock = Any()
+    private val pendingNotificationTaps = mutableListOf<BubblNotificationTap>()
 
     val events: SharedFlow<BubblEvent> = eventBus
 
@@ -64,6 +80,9 @@ object BubblSdk {
         eventBus.tryEmit(BubblEvent.Ready)
         appContext?.let {
             BubblWorkScheduler.schedulePeriodicWork(it, config)
+            if (config.enablePushHandling) {
+                syncCurrentFcmTokenAsync(it)
+            }
             if (config.enableLocationTracking && BubblAndroidLocationProvider.hasLocationPermission(it)) {
                 startLocationTracking(it)
             }
@@ -193,6 +212,12 @@ object BubblSdk {
         saveState(requireState().copy(correlationId = null))
     }
 
+    suspend fun setDefaultNotificationModalEnabled(enabled: Boolean) {
+        val nextConfig = requireConfig().copy(enableDefaultNotificationModal = enabled)
+        config = nextConfig
+        store.saveConfig(nextConfig)
+    }
+
     suspend fun registerPushToken(token: String) {
         val activeConfig = requireConfig()
         val nextState = requireState().copy(pushToken = token)
@@ -206,6 +231,44 @@ object BubblSdk {
 
     suspend fun syncFcmToken(token: String) {
         registerPushToken(token)
+    }
+
+    internal fun syncCurrentFcmTokenAsync(context: Context) {
+        backgroundScope.launch {
+            runCatching { syncCurrentFcmToken(context.applicationContext) }
+                .onFailure { error ->
+                    Log.w(logTag, "REG-TOKEN-02 token sync failed", error)
+                    eventBus.tryEmit(BubblEvent.Error("fcm_token_sync_failed", error.message.orEmpty()))
+                }
+        }
+    }
+
+    internal suspend fun syncCurrentFcmToken(context: Context): Boolean {
+        if (config?.enablePushHandling != true) {
+            return false
+        }
+
+        appContext = context.applicationContext
+        Log.d(logTag, "REG-TOKEN-01 requesting current FCM token")
+
+        val token = currentFcmToken()
+        if (token.isBlank()) {
+            Log.w(logTag, "REG-TOKEN-01 FCM returned a blank token")
+            eventBus.tryEmit(BubblEvent.Error("fcm_token_blank", "Firebase returned a blank FCM token."))
+            return false
+        }
+
+        Log.i(logTag, "New FCM token received (${token.length} chars)")
+        registerPushToken(token)
+
+        val result = flush()
+        return if (result.pendingCount == 0) {
+            Log.i(logTag, "REG-TOKEN-02 token synced successfully")
+            true
+        } else {
+            Log.w(logTag, "REG-TOKEN-02 token queued but ${result.pendingCount} ingest request(s) remain pending")
+            false
+        }
     }
 
     suspend fun handleFirebasePayload(
@@ -230,34 +293,207 @@ object BubblSdk {
         return notification
     }
 
+    fun openNotificationIntent(activity: Activity, intent: Intent?): Boolean =
+        openNotificationIntent(activity, intent, BubblNotificationTapPresentation.Auto)
+
+    fun openNotificationIntent(
+        activity: Activity,
+        intent: Intent?,
+        presentation: BubblNotificationTapPresentation
+    ): Boolean {
+        val launchIntent = intent ?: return false
+        if (launchIntent.getBooleanExtra(BubblNotificationPayloadCodec.extraHandledByHost, false)) {
+            return false
+        }
+
+        val payload = BubblNotificationPayloadCodec.fromIntent(launchIntent)
+            ?: BubblNotificationPayloadParser.fromFirebaseIntent(launchIntent)
+            ?: return false
+        val action = launchIntent.getStringExtra(BubblNotificationPayloadCodec.extraAction)
+            ?: BubblNotificationPayloadCodec.actionDefault
+        val tap = BubblNotificationTap(payload, action)
+
+        return when (presentation) {
+            BubblNotificationTapPresentation.HostModal -> openHostNotificationIntent(activity, tap)
+            BubblNotificationTapPresentation.DefaultModal -> openDefaultNotificationIntent(
+                activity = activity,
+                tap = tap,
+                forceDefaultModal = true
+            )
+            BubblNotificationTapPresentation.Auto -> openDefaultNotificationIntent(
+                activity = activity,
+                tap = tap,
+                forceDefaultModal = false
+            )
+        }
+    }
+
+    private fun openDefaultNotificationIntent(
+        activity: Activity,
+        tap: BubblNotificationTap,
+        forceDefaultModal: Boolean
+    ): Boolean {
+        return startDefaultNotificationActivity(
+            context = activity,
+            tap = tap,
+            forceDefaultModal = forceDefaultModal,
+            includeNewTaskFlag = false,
+            errorCode = "notification_intent_open_failed"
+        )
+    }
+
+    private fun openHostNotificationIntent(activity: Activity, tap: BubblNotificationTap): Boolean {
+        installIfNeeded(activity.applicationContext)
+        val queuedForLater = queuePendingNotificationTapIfNoSubscribers(tap)
+
+        backgroundScope.launch {
+            runCatching {
+                if (restoreForBackground()) {
+                    recordNotificationOpen(
+                        payload = tap.payload,
+                        action = tap.action,
+                        emitEvent = !queuedForLater,
+                        queueIfNoSubscribers = false
+                    )
+                    flush()
+                } else if (!queuedForLater) {
+                    eventBus.tryEmit(BubblEvent.NotificationTapped(tap.payload, tap.action))
+                }
+                Unit
+            }.onFailure { error ->
+                eventBus.tryEmit(BubblEvent.Error("notification_intent_open_failed", error.message.orEmpty()))
+            }
+        }
+
+        return true
+    }
+
+    private fun installIfNeeded(context: Context) {
+        if (appContext == null) {
+            install(context)
+        } else {
+            appContext = context.applicationContext
+        }
+    }
+
+    fun drainPendingNotificationTaps(): List<BubblNotificationTap> =
+        synchronized(pendingNotificationTapLock) {
+            pendingNotificationTaps.toList().also { pendingNotificationTaps.clear() }
+        }
+
+    suspend fun openNotificationModal(
+        context: Context,
+        payload: BubblNotificationPayload,
+        action: String? = null
+    ): Boolean {
+        installIfNeeded(context.applicationContext)
+        requireConfig()
+
+        return withContext(Dispatchers.Main.immediate) {
+            startDefaultNotificationActivity(
+                context = context,
+                tap = BubblNotificationTap(payload, action ?: BubblNotificationPayloadCodec.actionDefault),
+                forceDefaultModal = true,
+                includeNewTaskFlag = context !is Activity,
+                errorCode = "notification_modal_open_failed"
+            )
+        }
+    }
+
+    private fun startDefaultNotificationActivity(
+        context: Context,
+        tap: BubblNotificationTap,
+        forceDefaultModal: Boolean,
+        includeNewTaskFlag: Boolean,
+        errorCode: String
+    ): Boolean {
+        val modalIntent = Intent(context, BubblNotificationActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra(BubblNotificationPayloadCodec.extraForceDefaultModal, forceDefaultModal)
+        if (includeNewTaskFlag) {
+            modalIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        BubblNotificationPayloadCodec.addToIntent(modalIntent, tap.payload, tap.action)
+
+        return runCatching {
+            context.startActivity(modalIntent)
+            true
+        }.getOrElse { error ->
+            eventBus.tryEmit(BubblEvent.Error(errorCode, error.message.orEmpty()))
+            false
+        }
+    }
+
     suspend fun showNotification(payload: BubblNotificationPayload): BubblNotificationDisplayResult {
-        eventBus.tryEmit(BubblEvent.NotificationReceived(payload))
-        return renderDefaultNotification(payload)
+        recordNotificationReceived(payload)
+        return try {
+            renderDefaultNotification(payload)
+        } finally {
+            flushNotificationTelemetry()
+        }
     }
 
     suspend fun handleNotificationPayload(payload: BubblNotificationPayload): BubblNotificationDisplayResult {
         val activeConfig = requireConfig()
-        eventBus.tryEmit(BubblEvent.NotificationReceived(payload))
+        recordNotificationReceived(payload)
 
-        if (!activeConfig.enablePushHandling) {
-            return BubblNotificationDisplayResult(displayed = false, reason = "push_handling_disabled")
+        return try {
+            if (!activeConfig.enablePushHandling) {
+                BubblNotificationDisplayResult(displayed = false, reason = "push_handling_disabled")
+            } else {
+                when (activeConfig.notificationRenderingMode) {
+                    BubblNotificationRenderingMode.SdkDefault -> renderDefaultNotification(payload)
+                    BubblNotificationRenderingMode.HostRendered ->
+                        BubblNotificationDisplayResult(displayed = false, reason = "host_rendered")
+                    BubblNotificationRenderingMode.EventOnly ->
+                        BubblNotificationDisplayResult(displayed = false, reason = "event_only")
+                }
+            }
+        } finally {
+            flushNotificationTelemetry()
         }
-
-        val result = when (activeConfig.notificationRenderingMode) {
-            BubblNotificationRenderingMode.SdkDefault -> renderDefaultNotification(payload)
-            BubblNotificationRenderingMode.HostRendered ->
-                BubblNotificationDisplayResult(displayed = false, reason = "host_rendered")
-            BubblNotificationRenderingMode.EventOnly ->
-                BubblNotificationDisplayResult(displayed = false, reason = "event_only")
-        }
-
-        return result
     }
 
     suspend fun handleNotificationOpen(payload: BubblNotificationPayload, action: String? = null) {
+        recordNotificationOpen(
+            payload = payload,
+            action = action,
+            emitEvent = true,
+            queueIfNoSubscribers = true
+        )
+    }
+
+    private suspend fun recordNotificationOpen(
+        payload: BubblNotificationPayload,
+        action: String?,
+        emitEvent: Boolean,
+        queueIfNoSubscribers: Boolean
+    ) {
         requireConfig()
-        eventBus.tryEmit(BubblEvent.NotificationTapped(payload, action))
+        if (queueIfNoSubscribers) {
+            queuePendingNotificationTapIfNoSubscribers(BubblNotificationTap(payload, action))
+        }
+        if (emitEvent) {
+            eventBus.tryEmit(BubblEvent.NotificationTapped(payload, action))
+        }
         track(notificationInteractionEvent(payload, "notification_opened"))
+    }
+
+    private fun queuePendingNotificationTapIfNoSubscribers(tap: BubblNotificationTap): Boolean {
+        if (eventBus.subscriptionCount.value > 0) {
+            return false
+        }
+
+        synchronized(pendingNotificationTapLock) {
+            val alreadyQueued = pendingNotificationTaps.any { pending ->
+                pending.payload.id == tap.payload.id && pending.action == tap.action
+            }
+            if (!alreadyQueued) {
+                pendingNotificationTaps += tap
+            }
+        }
+
+        return true
     }
 
     suspend fun handleNotificationCta(payload: BubblNotificationPayload, action: String? = null) {
@@ -325,6 +561,18 @@ object BubblSdk {
         )
     }
 
+    private suspend fun recordNotificationReceived(payload: BubblNotificationPayload) {
+        eventBus.tryEmit(BubblEvent.NotificationReceived(payload))
+        track(notificationSentEvent(payload))
+    }
+
+    private suspend fun flushNotificationTelemetry() {
+        runCatching { flush() }
+            .onFailure { error ->
+                eventBus.tryEmit(BubblEvent.Error("notification_telemetry_flush_failed", error.message.orEmpty()))
+            }
+    }
+
     private suspend fun processGeofenceRuntime(body: String, location: BubblLocation) {
         eventBus.tryEmit(
             BubblEvent.GeofenceSnapshot(
@@ -361,14 +609,29 @@ object BubblSdk {
 
     suspend fun track(event: BubblTrackEvent) {
         val activeState = requireState()
+        val dashboardActivity = dashboardActivityName(event.activity) ?: return
         val payload = JSONObject()
             .put("device_registered_id", activeState.installId)
             .put("type", event.type)
-            .put("activity", event.activity)
+            .put("activity", dashboardActivity)
             .put("time", isoNow())
 
         event.locationId?.toIntOrNull()?.let { payload.put("location_id", it) }
-        event.curatedNotificationId?.toIntOrNull()?.let { payload.put("curated_notification_id", it) }
+        val curatedNotificationId = event.curatedNotificationId?.toIntOrNull()
+        if (event.type == "notification") {
+            if (curatedNotificationId == null) {
+                eventBus.tryEmit(
+                    BubblEvent.Error(
+                        "notification_missing_curated_id",
+                        "Notification analytics require a Dashboard curated notification id."
+                    )
+                )
+                return
+            }
+            payload.put("curated_notification_id", curatedNotificationId)
+        } else if (curatedNotificationId != null) {
+            payload.put("curated_notification_id", curatedNotificationId)
+        }
         event.latitude?.let { payload.put("latitude", it) }
         event.longitude?.let { payload.put("longitude", it) }
 
@@ -405,15 +668,33 @@ object BubblSdk {
         }
 
         store.saveQueue(remaining)
-        eventBus.tryEmit(BubblEvent.Diagnostic(BubblDiagnostics(booted = booted, pendingIngestCount = remaining.size)))
+        eventBus.tryEmit(
+            BubblEvent.Diagnostic(
+                BubblDiagnostics(
+                    booted = booted,
+                    pendingIngestCount = remaining.size,
+                    pushTokenSuffix = pushTokenSuffix(state?.pushToken)
+                )
+            )
+        )
 
         return BubblFlushResult(pendingCount = remaining.size)
     }
 
-    suspend fun diagnostics(): BubblDiagnostics = BubblDiagnostics(
-        booted = booted,
-        pendingIngestCount = store.pendingCount()
-    )
+    suspend fun diagnostics(): BubblDiagnostics {
+        val currentState = state ?: runCatching { store.loadState() }.getOrNull()
+        return BubblDiagnostics(
+            booted = booted,
+            pendingIngestCount = store.pendingCount(),
+            pushTokenSuffix = pushTokenSuffix(currentState?.pushToken)
+        )
+    }
+
+    private fun pushTokenSuffix(token: String?): String? =
+        token
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.takeLast(7)
 
     private suspend fun enqueue(path: String, payload: JSONObject) {
         store.append(BubblQueuedRequest(path = path, body = payload.toString()))
@@ -425,7 +706,7 @@ object BubblSdk {
         val activeState = requireState()
         val request = BubblHttpRequest(
             method = method,
-            url = endpointUrl(BubblTransportMap.runtimeBaseUrl(activeConfig), path),
+            url = endpointUrl(BubblTransportMap.transmissionBaseUrl(activeConfig), path),
             headers = headers(BubblTransportMap.runtimeAuthHeader, activeConfig, activeState),
             body = body
         )
@@ -443,7 +724,7 @@ object BubblSdk {
     private suspend fun sendIngest(entry: BubblQueuedRequest) {
         val activeConfig = requireConfig()
         val activeState = requireState()
-        val requestHeaders = headers(BubblTransportMap.dashboardAuthHeader, activeConfig, activeState) +
+        val requestHeaders = headers(BubblTransportMap.ingestAuthHeader, activeConfig, activeState) +
             mapOf("Idempotency-Key" to entry.idempotencyKey)
         val response = transport.send(
             BubblHttpRequest(
@@ -476,6 +757,9 @@ object BubblSdk {
 
     internal fun hasRuntimeState(): Boolean =
         config != null && state != null
+
+    internal fun defaultNotificationModalEnabled(): Boolean =
+        config?.enableDefaultNotificationModal ?: true
 
     internal suspend fun refreshGeofenceFromLastKnownLocation(context: Context): Boolean {
         val activeConfig = config ?: return false
@@ -512,6 +796,26 @@ object BubblSdk {
 
         return null
     }
+
+    private suspend fun currentFcmToken(): String =
+        suspendCancellableCoroutine { continuation ->
+            val task = FirebaseMessaging.getInstance().token
+            task.addOnSuccessListener { token ->
+                if (continuation.isActive) {
+                    continuation.resume(token.orEmpty())
+                }
+            }
+            task.addOnFailureListener { error ->
+                if (continuation.isActive) {
+                    continuation.resumeWithException(error)
+                }
+            }
+            task.addOnCanceledListener {
+                if (continuation.isActive) {
+                    continuation.resumeWithException(IllegalStateException("Firebase token request was cancelled."))
+                }
+            }
+        }
 
     private suspend fun loadGeofenceState(): BubblGeofenceState =
         store.loadRuntimeCache("geofence-state")
@@ -625,6 +929,14 @@ object BubblSdk {
             curatedNotificationId = payload.curatedNotificationId
         )
 
+    private fun notificationSentEvent(payload: BubblNotificationPayload): BubblTrackEvent =
+        BubblTrackEvent(
+            type = "notification",
+            activity = "notification_sent",
+            locationId = payload.locationId,
+            curatedNotificationId = payload.curatedNotificationId
+        )
+
     private fun notificationInteractionEvent(payload: BubblNotificationPayload, activity: String): BubblTrackEvent =
         BubblTrackEvent(
             type = "notification",
@@ -645,11 +957,22 @@ object BubblSdk {
             longitude = transition.location.longitude
         )
 
+    private fun dashboardActivityName(activity: String): String? =
+        when (activity) {
+            "notification_cta_tapped",
+            "cta_engagement" -> "cta_engagment"
+            "notification_media_viewed" -> "media_viewed"
+            "notification_dismissed" -> "dismissed"
+            "notification_opened",
+            "notification_survey_requested" -> null
+            else -> activity
+        }
+
     private suspend fun enqueueGeofenceNotificationBatch(dispatch: BubblGeofenceNotificationDispatch) {
         val activeState = requireState()
         val transition = dispatch.transition
         val payload = dispatch.payload
-        val notificationId = payload.curatedNotificationId?.toIntOrNull() ?: payload.id.toIntOrNull() ?: return
+        val notificationId = payload.curatedNotificationId?.toIntOrNull() ?: return
         val locationId = transition.locationId?.toIntOrNull() ?: payload.locationId?.toIntOrNull() ?: return
         val time = isoNow()
 

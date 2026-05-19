@@ -9,7 +9,7 @@ plugins {
 }
 
 group = providers.gradleProperty("GROUP").orElse("tech.bubbl.sdk").get()
-version = providers.gradleProperty("VERSION_NAME").orElse("3.0.0-beta.1").get()
+version = providers.gradleProperty("VERSION_NAME").orElse("3.0.0").get()
 
 android {
     namespace = "tech.bubbl.sdk"
@@ -77,7 +77,7 @@ mavenPublishing {
                 .orElse("Native Android SDK for Bubbl v3 runtime, geofence, notification, and ingest flows.")
                 .get(),
         )
-        url.set(providers.gradleProperty("POM_URL").orElse("https://github.com/bubbl-repo/renewed-sdk").get())
+        url.set(providers.gradleProperty("POM_URL").orElse("https://devops.bubbl.tech/bubbl/renewed-sdk").get())
 
         licenses {
             license {
@@ -97,15 +97,15 @@ mavenPublishing {
         scm {
             connection.set(
                 providers.gradleProperty("POM_SCM_CONNECTION")
-                    .orElse("scm:git:https://github.com/bubbl-repo/renewed-sdk.git")
+                    .orElse("scm:git:https://devops.bubbl.tech/bubbl/renewed-sdk.git")
                     .get(),
             )
             developerConnection.set(
                 providers.gradleProperty("POM_SCM_DEV_CONNECTION")
-                    .orElse("scm:git:ssh://git@github.com/bubbl-repo/renewed-sdk.git")
+                    .orElse("scm:git:ssh://git@devops.bubbl.tech/bubbl/renewed-sdk.git")
                     .get(),
             )
-            url.set(providers.gradleProperty("POM_SCM_URL").orElse("https://github.com/bubbl-repo/renewed-sdk").get())
+            url.set(providers.gradleProperty("POM_SCM_URL").orElse("https://devops.bubbl.tech/bubbl/renewed-sdk").get())
         }
     }
 }

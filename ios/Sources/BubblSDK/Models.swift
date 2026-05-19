@@ -4,6 +4,7 @@ public struct BubblConfig: Sendable, Equatable {
     public var apiKey: String
     public var environment: BubblEnvironment
     public var runtimeBaseUrl: URL?
+    public var transmissionBaseUrl: URL?
     public var ingestBaseUrl: URL?
     public var segments: [String]
     public var correlationId: String?
@@ -20,6 +21,7 @@ public struct BubblConfig: Sendable, Equatable {
         apiKey: String,
         environment: BubblEnvironment = .staging,
         runtimeBaseUrl: URL? = nil,
+        transmissionBaseUrl: URL? = nil,
         ingestBaseUrl: URL? = nil,
         segments: [String] = [],
         correlationId: String? = nil,
@@ -35,6 +37,7 @@ public struct BubblConfig: Sendable, Equatable {
         self.apiKey = apiKey
         self.environment = environment
         self.runtimeBaseUrl = runtimeBaseUrl
+        self.transmissionBaseUrl = transmissionBaseUrl
         self.ingestBaseUrl = ingestBaseUrl
         self.segments = segments
         self.correlationId = correlationId
@@ -321,21 +324,24 @@ public struct BubblFlushResult: Sendable, Codable, Equatable {
 }
 
 public struct BubblDiagnostics: Sendable, Codable, Equatable {
-    public var sdkVersion = "3.0.0-beta.1"
+    public var sdkVersion = "3.0.0"
     public var platform = "ios"
     public var booted = false
     public var pendingIngestCount = 0
+    public var pushTokenSuffix: String?
 
     public init(
-        sdkVersion: String = "3.0.0-beta.1",
+        sdkVersion: String = "3.0.0",
         platform: String = "ios",
         booted: Bool = false,
-        pendingIngestCount: Int = 0
+        pendingIngestCount: Int = 0,
+        pushTokenSuffix: String? = nil
     ) {
         self.sdkVersion = sdkVersion
         self.platform = platform
         self.booted = booted
         self.pendingIngestCount = pendingIngestCount
+        self.pushTokenSuffix = pushTokenSuffix
     }
 }
 

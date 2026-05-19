@@ -11,6 +11,7 @@ class BubblConfig {
     required this.apiKey,
     this.environment = BubblEnvironment.staging,
     this.runtimeBaseUrl,
+    this.transmissionBaseUrl,
     this.ingestBaseUrl,
     this.segments = const <String>[],
     this.correlationId,
@@ -27,6 +28,7 @@ class BubblConfig {
   final String apiKey;
   final BubblEnvironment environment;
   final String? runtimeBaseUrl;
+  final String? transmissionBaseUrl;
   final String? ingestBaseUrl;
   final List<String> segments;
   final String? correlationId;
@@ -225,16 +227,18 @@ class BubblFlushResult {
 
 class BubblDiagnostics {
   const BubblDiagnostics({
-    this.sdkVersion = '3.0.0-beta.1',
+    this.sdkVersion = '3.0.0',
     this.platform = 'flutter',
     this.booted = false,
     this.pendingIngestCount = 0,
+    this.pushTokenSuffix,
   });
 
   final String sdkVersion;
   final String platform;
   final bool booted;
   final int pendingIngestCount;
+  final String? pushTokenSuffix;
 }
 
 sealed class BubblEvent {

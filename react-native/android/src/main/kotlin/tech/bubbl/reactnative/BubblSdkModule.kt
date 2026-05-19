@@ -39,6 +39,7 @@ import tech.bubbl.sdk.BubblNotificationPayload
 import tech.bubbl.sdk.BubblNotificationRenderingMode
 import tech.bubbl.sdk.BubblNotificationSource
 import tech.bubbl.sdk.BubblNotificationSurvey
+import tech.bubbl.sdk.BubblNotificationTap
 import tech.bubbl.sdk.BubblSdk
 import tech.bubbl.sdk.BubblSurveyAnswer
 import tech.bubbl.sdk.BubblSurveyChoice
@@ -74,6 +75,9 @@ class BubblSdkModule(
                 BubblSdk.events.collectLatest { event ->
                     emitEvent(event.toWritableMap())
                 }
+            }
+            BubblSdk.drainPendingNotificationTaps().forEach { tap ->
+                emitEvent(tap.toWritableMap())
             }
         }
     }
@@ -163,6 +167,12 @@ class BubblSdkModule(
     }
 
     @ReactMethod
+    fun setDefaultNotificationModalEnabled(enabled: Boolean, promise: Promise) = resolve(promise) {
+        BubblSdk.setDefaultNotificationModalEnabled(enabled)
+        null
+    }
+
+    @ReactMethod
     fun registerPushToken(token: String, promise: Promise) = resolve(promise) {
         BubblSdk.registerPushToken(token)
         null
@@ -187,6 +197,11 @@ class BubblSdkModule(
     fun handleNotificationOpen(payload: ReadableMap, action: String?, promise: Promise) = resolve(promise) {
         BubblSdk.handleNotificationOpen(payload.toNotificationPayload(), action)
         null
+    }
+
+    @ReactMethod
+    fun openNotificationModal(payload: ReadableMap, action: String?, promise: Promise) = resolve(promise) {
+        BubblSdk.openNotificationModal(reactContext, payload.toNotificationPayload(), action)
     }
 
     @ReactMethod
@@ -257,6 +272,7 @@ class BubblSdkModule(
                 BubblEnvironment.valueOf(it.replaceFirstChar(Char::uppercaseChar))
             },
             runtimeBaseUrl = string("runtimeBaseUrl"),
+            transmissionBaseUrl = string("transmissionBaseUrl"),
             ingestBaseUrl = string("ingestBaseUrl"),
             segments = stringList("segments"),
             correlationId = string("correlationId"),
@@ -366,6 +382,7 @@ class BubblSdkModule(
         putString("platform", platform)
         putBoolean("booted", booted)
         putInt("pendingIngestCount", pendingIngestCount)
+        putNullableString("pushTokenSuffix", pushTokenSuffix)
     }
 
     private fun BubblFlushResult.toWritableMap(): WritableMap = Arguments.createMap().apply {
@@ -480,6 +497,9 @@ class BubblSdkModule(
             putString("message", message)
         }
     }
+
+    private fun BubblNotificationTap.toWritableMap(): WritableMap =
+        eventPayload("notificationTapped", payload, action)
 
     private fun eventPayload(
         type: String,

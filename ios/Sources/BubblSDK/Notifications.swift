@@ -240,6 +240,50 @@ public final class BubblNotificationCenterDelegate: NSObject, UNUserNotification
 
 #if os(iOS)
 @MainActor
+public enum BubblNotificationModalPresenter {
+    public static func present(
+        _ payload: BubblNotificationPayload,
+        sdk: BubblClient = .shared
+    ) -> Bool {
+        guard let presenter = topViewController() else {
+            return false
+        }
+
+        let viewController = BubblNotificationViewController(payload: payload, sdk: sdk)
+        presenter.present(viewController, animated: true)
+        return true
+    }
+
+    private static func topViewController() -> UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let activeScene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+        let rootViewController = activeScene?
+            .windows
+            .first(where: \.isKeyWindow)?
+            .rootViewController
+            ?? activeScene?.windows.first?.rootViewController
+
+        return topViewController(from: rootViewController)
+    }
+
+    private static func topViewController(from root: UIViewController?) -> UIViewController? {
+        if let navigation = root as? UINavigationController {
+            return topViewController(from: navigation.visibleViewController)
+        }
+
+        if let tab = root as? UITabBarController {
+            return topViewController(from: tab.selectedViewController)
+        }
+
+        if let presented = root?.presentedViewController {
+            return topViewController(from: presented)
+        }
+
+        return root
+    }
+}
+
+@MainActor
 public final class BubblNotificationViewController: UIViewController {
     private let payload: BubblNotificationPayload
     private let sdk: BubblClient
@@ -262,25 +306,66 @@ public final class BubblNotificationViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
 
+        let closeButton = UIButton(type: .system)
+        closeButton.setTitle("Close", for: .normal)
+        closeButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+        closeButton.accessibilityLabel = "Close notification"
+        closeButton.contentEdgeInsets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        closeButton.addAction(UIAction { [weak self] _ in
+            self?.dismiss(animated: true)
+        }, for: .touchUpInside)
+        view.addSubview(closeButton)
+
         let scrollView = UIScrollView()
+        scrollView.alwaysBounceVertical = true
+        scrollView.contentInsetAdjustmentBehavior = .never
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
+
+        let contentStack = UIStackView()
+        contentStack.axis = .vertical
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        contentStack.isLayoutMarginsRelativeArrangement = true
+        contentStack.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: 24,
+            leading: 24,
+            bottom: 32,
+            trailing: 24
+        )
+        scrollView.addSubview(contentStack)
+
+        let topSpacer = UIView()
+        let bottomSpacer = UIView()
+        topSpacer.setContentHuggingPriority(.defaultLow, for: .vertical)
+        bottomSpacer.setContentHuggingPriority(.defaultLow, for: .vertical)
+        topSpacer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        bottomSpacer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 
         let stack = UIStackView()
         stack.axis = .vertical
         stack.spacing = 14
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.addSubview(stack)
+        stack.setContentHuggingPriority(.required, for: .vertical)
+
+        contentStack.addArrangedSubview(topSpacer)
+        contentStack.addArrangedSubview(stack)
+        contentStack.addArrangedSubview(bottomSpacer)
 
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            closeButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+            closeButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            scrollView.topAnchor.constraint(equalTo: closeButton.bottomAnchor, constant: 8),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 24),
-            stack.leadingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(equalTo: scrollView.frameLayoutGuide.trailingAnchor, constant: -24),
-            stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -24)
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            contentStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentStack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentStack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+            contentStack.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.heightAnchor),
+            topSpacer.heightAnchor.constraint(equalTo: bottomSpacer.heightAnchor)
         ])
 
         stack.addArrangedSubview(label(payload.title, font: .preferredFont(forTextStyle: .title2), weight: .bold))
@@ -351,6 +436,10 @@ public final class BubblNotificationViewController: UIViewController {
     }
 
     private func submitSurvey() {
+        guard let curatedNotificationId = payload.curatedNotificationId else {
+            return
+        }
+
         let answers = (payload.survey?.questions ?? []).map { question in
             if let choiceId = selectedChoices[question.id] {
                 return BubblSurveyAnswer(questionId: question.id, type: question.type, choiceIds: [choiceId])
@@ -366,7 +455,7 @@ public final class BubblNotificationViewController: UIViewController {
         Task {
             try? await self.sdk.submitSurveyResponse(
                 BubblSurveyResponse(
-                    curatedNotificationId: self.payload.curatedNotificationId ?? self.payload.id,
+                    curatedNotificationId: curatedNotificationId,
                     locationId: self.payload.locationId,
                     answers: answers
                 )
@@ -380,6 +469,8 @@ public final class BubblNotificationViewController: UIViewController {
         label.text = text
         label.numberOfLines = 0
         label.font = .systemFont(ofSize: font.pointSize, weight: weight)
+        label.adjustsFontForContentSizeCategory = true
+        label.lineBreakMode = .byWordWrapping
         return label
     }
 
@@ -387,6 +478,10 @@ public final class BubblNotificationViewController: UIViewController {
         let button = UIButton(type: .system)
         button.setTitle(title, for: .normal)
         button.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+        button.titleLabel?.numberOfLines = 0
+        button.titleLabel?.lineBreakMode = .byWordWrapping
+        button.contentEdgeInsets = UIEdgeInsets(top: 12, left: 14, bottom: 12, right: 14)
+        button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
         button.addAction(UIAction { _ in action() }, for: .touchUpInside)
         return button
     }
@@ -432,11 +527,23 @@ public enum BubblNotificationPayloadParser {
             "curated_notification_id",
             "curatedNotificationId",
             "curated_notification",
-            "notification_id",
-            "notificationId"
+            "curatedNotification",
+            "n_id",
+            "nId"
         )
         let locationId = firstPresent(data, "location_id", "locationId", "locationID")
-        let id = firstPresent(data, "id", "message_id", "messageId", "push_id", "pushId")
+        let id = firstPresent(
+            data,
+            "id",
+            "message_id",
+            "messageId",
+            "push_id",
+            "pushId",
+            "notification_id",
+            "notificationId",
+            "gcm.message_id",
+            "google.message_id"
+        )
             ?? curatedNotificationId
             ?? stableId(title: title, body: body, curatedNotificationId: curatedNotificationId, locationId: locationId)
 

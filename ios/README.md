@@ -12,10 +12,19 @@ try await sdk.boot(
 )
 ```
 
-Default environment endpoints mirror the legacy SDKs: `.development` and
-`.nightly` use nightly, `.staging` uses staging, and `.production` uses
-`https://production.api.bubbl.tech` for Transmission plus
-`https://platform.bubbl.tech` for Dashboard ingest. Public
+Apps with custom notification UI can keep SDK device notification handling on
+and disable only bundled modal/detail presentation with
+`enableDefaultNotificationModal: false` at boot or
+`try await sdk.setDefaultNotificationModalEnabled(false)` after boot.
+
+Apps with an in-app notification inbox/history can present the bundled detail
+UI for a stored payload with `try await sdk.openNotificationModal(payload)`.
+That opens the default modal without posting another device notification.
+
+Default environment endpoints follow the renewed split hosts: `.development`
+and `.nightly` use `nightly.*`, `.staging` uses `staging.*`, and `.production` uses
+`https://transmission.bubbl.tech` for Transmission plus
+`https://ingest.bubbl.tech` for ingest. Public
 `defaultDistanceMeters` remains meters; the Swift transport converts it to the
 current Transmission v2 wire distance unit before calling `/api/check-geofence`.
 

@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.0.0-beta.1")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.0.0")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -117,12 +117,12 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(fallback?.privacyText, "Cached privacy")
     }
 
-    func testDefaultEnvironmentEndpointsMirrorLegacySdksAndConvertPublicMetersForTransmission() async throws {
+    func testDefaultEnvironmentEndpointsUseRenewedSplitHostsAndConvertPublicMetersForTransmission() async throws {
         let cases: [(BubblEnvironment, String, String)] = [
-            (.development, "nightly.api.bubbl.tech", "nightly-platform.bubbl.tech"),
-            (.nightly, "nightly.api.bubbl.tech", "nightly-platform.bubbl.tech"),
-            (.staging, "staging.api.bubbl.tech", "staging-platform.bubbl.tech"),
-            (.production, "production.api.bubbl.tech", "platform.bubbl.tech"),
+            (.development, "nightly.transmission.bubbl.tech", "nightly.ingest.bubbl.tech"),
+            (.nightly, "nightly.transmission.bubbl.tech", "nightly.ingest.bubbl.tech"),
+            (.staging, "staging.transmission.bubbl.tech", "staging.ingest.bubbl.tech"),
+            (.production, "transmission.bubbl.tech", "ingest.bubbl.tech"),
         ]
 
         for (environment, expectedRuntimeHost, expectedIngestHost) in cases {
@@ -158,7 +158,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(ingestRequest.url.host, expectedIngestHost)
             XCTAssertEqual(distance, 1.0, accuracy: 0.001)
             XCTAssertEqual(BubblTransportMap.runtimeAuthHeader, "x-api-key")
-            XCTAssertEqual(BubblTransportMap.dashboardAuthHeader, "ApiKey")
+            XCTAssertEqual(BubblTransportMap.ingestAuthHeader, "ApiKey")
         }
     }
 
@@ -260,6 +260,30 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(payload.media?.url.absoluteString, "https://cdn.test/offer.png")
         XCTAssertEqual(payload.cta?.label, "Open")
         XCTAssertEqual(payload.survey?.questions.single?.id, "1")
+    }
+
+    func testParsesLegacyNotificationIdAliasAsCuratedNotificationId() throws {
+        let payload = try XCTUnwrap(
+            BubblNotificationPayloadParser.fromRemoteNotification([
+                "aps": ["alert": ["title": "Legacy push", "body": "Uses n_id"]],
+                "n_id": "42"
+            ])
+        )
+
+        XCTAssertEqual(payload.curatedNotificationId, "42")
+        XCTAssertEqual(payload.id, "42")
+    }
+
+    func testKeepsProviderNotificationIdOutOfCuratedNotificationId() throws {
+        let payload = try XCTUnwrap(
+            BubblNotificationPayloadParser.fromRemoteNotification([
+                "aps": ["alert": ["title": "Provider push", "body": "Has a provider id"]],
+                "notification_id": "provider-123"
+            ])
+        )
+
+        XCTAssertEqual(payload.id, "provider-123")
+        XCTAssertNil(payload.curatedNotificationId)
     }
 
     func testNotificationAttachmentPlannerAcceptsRemoteImageMedia() throws {
@@ -385,7 +409,17 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(presenter.payloads.single?.source, .runtime)
         XCTAssertEqual(presenter.payloads.single?.title, "Push hello")
         let diagnostics = await sdk.diagnostics()
-        XCTAssertEqual(diagnostics.pendingIngestCount, 2)
+        XCTAssertEqual(diagnostics.pendingIngestCount, 0)
+
+        let activities = try transport.requests
+            .filter { $0.url.path == "/api/activities" }
+            .map { request -> String in
+                let body = try XCTUnwrap(request.body)
+                let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+                return try XCTUnwrap(json?["activity"] as? String)
+            }
+        XCTAssertTrue(activities.contains("notification_sent"))
+        XCTAssertTrue(activities.contains("notification_delivered"))
     }
 
     func testGeofenceEngineFiresEnterExitNotificationsWithCooldownAndMaximumTriggers() throws {
@@ -545,7 +579,17 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(presenter.payloads.count, 1)
         XCTAssertEqual(presenter.payloads.single?.title, "Welcome")
         let diagnostics = await sdk.diagnostics()
-        XCTAssertEqual(diagnostics.pendingIngestCount, 6)
+        XCTAssertEqual(diagnostics.pendingIngestCount, 1)
+
+        let activities = try transport.requests
+            .filter { $0.url.path == "/api/activities" }
+            .map { request -> String in
+                let body = try XCTUnwrap(request.body)
+                let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+                return try XCTUnwrap(json?["activity"] as? String)
+            }
+        XCTAssertTrue(activities.contains("notification_sent"))
+        XCTAssertTrue(activities.contains("notification_delivered"))
     }
 
     func testGeofenceRegionSelectionCapsToNearestTwenty() {
@@ -593,20 +637,57 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(payload?.title, "APNs title")
         XCTAssertEqual(presenter.payloads.single?.id, payload?.id)
         let diagnostics = await sdk.diagnostics()
-        XCTAssertEqual(diagnostics.pendingIngestCount, 2)
-
-        let flush = await sdk.flush()
-        XCTAssertEqual(flush.pendingCount, 0)
+        XCTAssertEqual(diagnostics.pendingIngestCount, 0)
 
         let paths = transport.requests.map(\.url.path)
         XCTAssertTrue(paths.contains("/api/device-data"))
         XCTAssertTrue(paths.contains("/api/activities"))
 
-        let activityRequest = try XCTUnwrap(transport.requests.first { $0.url.path == "/api/activities" })
-        let body = try XCTUnwrap(activityRequest.body)
-        let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
-        XCTAssertEqual(json?["activity"] as? String, "notification_delivered")
-        XCTAssertEqual(json?["curated_notification_id"] as? Int, 99)
+        let activityRequests = transport.requests.filter { $0.url.path == "/api/activities" }
+        let activities = try activityRequests.map { request -> String in
+            let body = try XCTUnwrap(request.body)
+            let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+            XCTAssertEqual(json?["curated_notification_id"] as? Int, 99)
+            return try XCTUnwrap(json?["activity"] as? String)
+        }
+        XCTAssertTrue(activities.contains("notification_sent"))
+        XCTAssertTrue(activities.contains("notification_delivered"))
+    }
+
+    func testHostRenderedNotificationWithoutCuratedIdDoesNotHitDashboardActivityLookup() async throws {
+        let transport = MockTransport { _ in
+            BubblHTTPResponse(statusCode: 200, data: #"{"success":true}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+
+        _ = try await sdk.boot(
+            BubblConfig(
+                apiKey: "sdk-key",
+                runtimeBaseUrl: URL(string: "https://runtime.test")!,
+                ingestBaseUrl: URL(string: "https://ingest.test")!,
+                notificationRenderingMode: .hostRendered
+            )
+        )
+
+        let payload = try await sdk.handleRemoteNotification([
+            "aps": ["alert": ["title": "APNs title", "body": "APNs body"]],
+            "notification_id": "provider-99"
+        ])
+
+        XCTAssertEqual(payload?.id, "provider-99")
+        XCTAssertNil(payload?.curatedNotificationId)
+        let diagnostics = await sdk.diagnostics()
+        XCTAssertEqual(diagnostics.pendingIngestCount, 0)
+
+        let notificationSent = transport.requests.contains { request in
+            guard request.url.path == "/api/activities",
+                  let body = request.body,
+                  let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+                return false
+            }
+            return json["activity"] as? String == "notification_sent"
+        }
+        XCTAssertFalse(notificationSent)
     }
 
     func testNotificationResponseAndInteractionsQueueAnalyticsEvents() async throws {
@@ -643,7 +724,7 @@ final class BubblSDKTests: XCTestCase {
         try await sdk.handleNotificationSurveyRequested(payload)
 
         let diagnostics = await sdk.diagnostics()
-        XCTAssertEqual(diagnostics.pendingIngestCount, 5)
+        XCTAssertEqual(diagnostics.pendingIngestCount, 3)
 
         _ = await sdk.flush()
 
@@ -655,10 +736,8 @@ final class BubblSDKTests: XCTestCase {
                 return try XCTUnwrap(json?["activity"] as? String)
             }
 
-        XCTAssertTrue(activities.contains("notification_opened"))
-        XCTAssertTrue(activities.contains("notification_cta_tapped"))
-        XCTAssertTrue(activities.contains("notification_media_viewed"))
-        XCTAssertTrue(activities.contains("notification_survey_requested"))
+        XCTAssertEqual(activities.filter { $0 == "cta_engagment" }.count, 1)
+        XCTAssertTrue(activities.contains("media_viewed"))
     }
 
     private func temporaryDirectory() -> URL {

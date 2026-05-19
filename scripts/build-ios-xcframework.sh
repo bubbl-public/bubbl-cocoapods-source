@@ -69,9 +69,9 @@ MODULEMAP
   <key>CFBundlePackageType</key>
   <string>FMWK</string>
   <key>CFBundleShortVersionString</key>
-  <string>3.0.0-beta.1</string>
+  <string>3.0.0</string>
   <key>CFBundleVersion</key>
-  <string>3.0.0-beta.1</string>
+  <string>3.0.0</string>
 </dict>
 </plist>
 PLIST

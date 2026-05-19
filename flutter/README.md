@@ -8,7 +8,7 @@ The Dart facade forwards calls to the native Android and iOS SDK cores. Native r
 
 ```yaml
 dependencies:
-  bubbl_flutter_sdk: ^3.0.0-beta.1
+  bubbl_flutter_sdk: ^3.0.0
 ```
 
 ## Boot
@@ -18,6 +18,32 @@ await BubblSdk.instance.boot(
   const BubblConfig(apiKey: '...'),
 );
 ```
+
+For apps that render their own in-app notification modal while still letting
+the native SDK trigger device notifications:
+
+```dart
+await BubblSdk.instance.boot(
+  const BubblConfig(
+    apiKey: '...',
+    notificationRenderingMode: BubblNotificationRenderingMode.sdkDefault,
+    enableDefaultNotificationModal: false,
+  ),
+);
+
+// Or toggle it after boot.
+await BubblSdk.instance.disableDefaultNotificationModal();
+```
+
+Apps with their own notification inbox/history can still ask the SDK to show
+the bundled detail UI for a stored payload:
+
+```dart
+await BubblSdk.instance.openNotificationModal(payload);
+```
+
+This opens the default modal/detail UI without posting another device
+notification.
 
 ## Notes
 

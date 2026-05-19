@@ -110,6 +110,8 @@ class BubblFlutterSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Ev
             "updateSegments" -> BubblSdk.updateSegments(call.argumentsMap().stringList("tags"))
             "setCorrelationId" -> BubblSdk.setCorrelationId(call.argumentsMap().requiredString("value"))
             "clearCorrelationId" -> BubblSdk.clearCorrelationId()
+            "setDefaultNotificationModalEnabled" ->
+                BubblSdk.setDefaultNotificationModalEnabled(call.argumentsMap().bool("enabled", true))
             "registerPushToken" -> BubblSdk.registerPushToken(call.argumentsMap().requiredString("token"))
             "handleFirebasePayload" -> {
                 val payload = call.argumentsMap()["payload"] as? Map<*, *> ?: emptyMap<String, String>()
@@ -120,6 +122,10 @@ class BubblFlutterSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Ev
             "handleNotificationOpen" -> {
                 val args = call.argumentsMap()
                 BubblSdk.handleNotificationOpen(args.payloadArgument(), args["action"] as? String)
+            }
+            "openNotificationModal" -> {
+                val args = call.argumentsMap()
+                BubblSdk.openNotificationModal(context, args.payloadArgument(), args["action"] as? String)
             }
             "handleNotificationCta" -> {
                 val args = call.argumentsMap()
@@ -150,6 +156,7 @@ class BubblFlutterSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Ev
                 BubblEnvironment.valueOf(it.replaceFirstChar(Char::uppercaseChar))
             },
             runtimeBaseUrl = string("runtimeBaseUrl"),
+            transmissionBaseUrl = string("transmissionBaseUrl"),
             ingestBaseUrl = string("ingestBaseUrl"),
             segments = stringList("segments"),
             correlationId = string("correlationId"),
@@ -261,7 +268,8 @@ class BubblFlutterSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Ev
         "sdkVersion" to sdkVersion,
         "platform" to platform,
         "booted" to booted,
-        "pendingIngestCount" to pendingIngestCount
+        "pendingIngestCount" to pendingIngestCount,
+        "pushTokenSuffix" to pushTokenSuffix
     )
 
     private fun BubblFlushResult.toMap(): Map<String, Any?> = mapOf("pendingCount" to pendingCount)

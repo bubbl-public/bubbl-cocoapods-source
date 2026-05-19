@@ -36,6 +36,9 @@ RCT_EXTERN_METHOD(setCorrelationId:(NSString *)value
                   rejecter:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(clearCorrelationId:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(setDefaultNotificationModalEnabled:(BOOL)enabled
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(registerPushToken:(NSString *)token
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
@@ -49,6 +52,10 @@ RCT_EXTERN_METHOD(handleNotificationPayload:(NSDictionary *)payload
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(handleNotificationOpen:(NSDictionary *)payload
+                  action:(NSString *)action
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(openNotificationModal:(NSDictionary *)payload
                   action:(NSString *)action
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)

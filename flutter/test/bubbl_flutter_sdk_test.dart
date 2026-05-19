@@ -25,13 +25,18 @@ void main() {
               };
             case 'diagnostics':
               return <String, Object?>{
-                'sdkVersion': '3.0.0-beta.1',
+                'sdkVersion': '3.0.0',
                 'platform': 'flutter',
                 'booted': false,
                 'pendingIngestCount': 0,
+                'pushTokenSuffix': '1234567',
               };
             case 'showNotification':
               return <String, Object?>{'displayed': true};
+            case 'openNotificationModal':
+              return true;
+            case 'setDefaultNotificationModalEnabled':
+              return null;
           }
           return null;
         });
@@ -52,9 +57,10 @@ void main() {
   test('diagnostics returns scaffold platform defaults', () async {
     final diagnostics = await BubblSdk.instance.diagnostics();
 
-    expect(diagnostics.sdkVersion, '3.0.0-beta.1');
+    expect(diagnostics.sdkVersion, '3.0.0');
     expect(diagnostics.platform, 'flutter');
     expect(diagnostics.booted, isFalse);
+    expect(diagnostics.pushTokenSuffix, '1234567');
   });
 
   test('notification payloads serialize through native channel', () async {
@@ -69,5 +75,25 @@ void main() {
     );
 
     expect(result.displayed, isTrue);
+  });
+
+  test('default notification modal can be disabled for custom UI', () async {
+    await expectLater(
+      BubblSdk.instance.disableDefaultNotificationModal(),
+      completes,
+    );
+  });
+
+  test('notification payloads can open the default modal', () async {
+    final opened = await BubblSdk.instance.openNotificationModal(
+      const BubblNotificationPayload(
+        id: 'notification-1',
+        title: 'Hello',
+        body: 'World',
+        source: BubblNotificationSource.manual,
+      ),
+    );
+
+    expect(opened, isTrue);
   });
 }

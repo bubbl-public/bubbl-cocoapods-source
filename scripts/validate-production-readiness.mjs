@@ -92,7 +92,7 @@ add(
   checks,
   'blocker',
   'ci.workflow',
-  listFiles('.github/workflows').some((file) => /\.ya?ml$/.test(file)),
+  exists('.gitlab-ci.yml') || listFiles('.github/workflows').some((file) => /\.ya?ml$/.test(file)),
   'CI workflow exists',
   'Production needs a checked-in workflow for contract, native, wrapper, and canary validation.',
 );

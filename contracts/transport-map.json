@@ -1,22 +1,30 @@
 {
-  "contractVersion": "3.0.0-beta.1",
+  "contractVersion": "3.0.0",
   "environments": {
     "development": {
-      "runtimeBaseUrl": "https://nightly.api.bubbl.tech",
-      "ingestBaseUrl": "https://nightly-platform.bubbl.tech",
+      "platformApiBaseUrl": "https://nightly.api.bubbl.tech",
+      "transmissionBaseUrl": "https://nightly.transmission.bubbl.tech",
+      "runtimeBaseUrl": "https://nightly.transmission.bubbl.tech",
+      "ingestBaseUrl": "https://nightly.ingest.bubbl.tech",
       "legacyAlias": "nightly"
     },
     "nightly": {
-      "runtimeBaseUrl": "https://nightly.api.bubbl.tech",
-      "ingestBaseUrl": "https://nightly-platform.bubbl.tech"
+      "platformApiBaseUrl": "https://nightly.api.bubbl.tech",
+      "transmissionBaseUrl": "https://nightly.transmission.bubbl.tech",
+      "runtimeBaseUrl": "https://nightly.transmission.bubbl.tech",
+      "ingestBaseUrl": "https://nightly.ingest.bubbl.tech"
     },
     "staging": {
-      "runtimeBaseUrl": "https://staging.api.bubbl.tech",
-      "ingestBaseUrl": "https://staging-platform.bubbl.tech"
+      "platformApiBaseUrl": "https://staging.api.bubbl.tech",
+      "transmissionBaseUrl": "https://staging.transmission.bubbl.tech",
+      "runtimeBaseUrl": "https://staging.transmission.bubbl.tech",
+      "ingestBaseUrl": "https://staging.ingest.bubbl.tech"
     },
     "production": {
-      "runtimeBaseUrl": "https://production.api.bubbl.tech",
-      "ingestBaseUrl": "https://platform.bubbl.tech"
+      "platformApiBaseUrl": "https://api.bubbl.tech",
+      "transmissionBaseUrl": "https://transmission.bubbl.tech",
+      "runtimeBaseUrl": "https://transmission.bubbl.tech",
+      "ingestBaseUrl": "https://ingest.bubbl.tech"
     }
   },
   "runtime": {
@@ -47,42 +55,42 @@
       "method": "POST",
       "path": "/api/device-registerd/create",
       "authHeader": "ApiKey",
-      "owner": "dashboard",
+      "owner": "ingest",
       "wireShape": "legacy-mirrored"
     },
     "bootBatch": {
       "method": "POST",
       "path": "/api/device-data",
       "authHeader": "ApiKey",
-      "owner": "dashboard",
+      "owner": "ingest",
       "wireShape": "legacy-mirrored"
     },
     "trackEvent": {
       "method": "POST",
       "path": "/api/activities",
       "authHeader": "ApiKey",
-      "owner": "dashboard",
+      "owner": "ingest",
       "wireShape": "legacy-mirrored"
     },
     "updateSegments": {
       "method": "POST",
       "path": "/api/segments",
       "authHeader": "ApiKey",
-      "owner": "dashboard",
+      "owner": "ingest",
       "wireShape": "legacy-mirrored"
     },
     "submitSurveyResponse": {
       "method": "POST",
       "path": "/api/survey-response",
       "authHeader": "ApiKey",
-      "owner": "dashboard",
+      "owner": "ingest",
       "wireShape": "legacy-mirrored"
     },
     "trackGeofenceBatch": {
       "method": "POST",
       "path": "/api/geofence-data",
       "authHeader": "ApiKey",
-      "owner": "dashboard",
+      "owner": "ingest",
       "wireShape": "legacy-mirrored"
     }
   },

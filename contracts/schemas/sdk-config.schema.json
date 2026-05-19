@@ -10,7 +10,11 @@
       "type": "string",
       "enum": ["development", "nightly", "staging", "production"]
     },
-    "runtimeBaseUrl": { "type": ["string", "null"] },
+    "transmissionBaseUrl": { "type": ["string", "null"] },
+    "runtimeBaseUrl": {
+      "type": ["string", "null"],
+      "description": "Backward-compatible alias for transmissionBaseUrl."
+    },
     "ingestBaseUrl": { "type": ["string", "null"] },
     "segments": {
       "type": "array",

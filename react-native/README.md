@@ -18,6 +18,66 @@ import { Bubbl } from '@bubbl-tech/react-native-sdk';
 await Bubbl.boot({ apiKey: '...' });
 ```
 
+For apps that render their own in-app notification modal while still letting
+the native SDK trigger device notifications:
+
+```ts
+await Bubbl.boot({
+  apiKey: '...',
+  notificationRenderingMode: 'sdkDefault',
+  enableDefaultNotificationModal: false,
+});
+
+// Or toggle it after boot.
+await Bubbl.disableDefaultNotificationModal();
+```
+
+Apps with their own notification inbox/history can still ask the SDK to show
+the bundled detail UI for a stored payload:
+
+```ts
+await Bubbl.openNotificationModal(payload);
+```
+
+This opens the default modal/detail UI without posting another device
+notification.
+
+## Android Notification Taps
+
+Firebase auto-rendered notifications launch the app's `MainActivity` with the
+notification payload as intent extras. Forward those launcher intents into the
+SDK so notification taps open the app and route to the right modal.
+
+Use `openDefaultModal(...)` when the SDK should show the bundled modal:
+
+```kotlin
+import android.content.Intent
+import android.os.Bundle
+import com.facebook.react.ReactActivity
+import tech.bubbl.reactnative.BubblSdkNotificationIntents
+
+class MainActivity : ReactActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        BubblSdkNotificationIntents.openDefaultModal(this, intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        BubblSdkNotificationIntents.openDefaultModal(this, intent)
+    }
+}
+```
+
+Use `openHostModal(...)` when the app renders its own modal. The SDK records
+the tap, keeps the payload pending across cold start, and emits
+`notificationTapped` once the React Native bridge subscribes:
+
+```kotlin
+BubblSdkNotificationIntents.openHostModal(this, intent)
+```
+
 ## Events
 
 ```ts

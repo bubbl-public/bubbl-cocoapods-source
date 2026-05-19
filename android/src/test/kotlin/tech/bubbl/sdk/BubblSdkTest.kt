@@ -8,8 +8,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.io.IOException
@@ -48,10 +50,38 @@ class BubblSdkTest {
         assertEquals("/api/device-data", URI(requests.single().url).path)
         assertEquals("POST", requests.single().method)
         assertEquals("sdk-key", requests.single().headers["ApiKey"])
-        assertEquals("3.0.0-beta.1", requests.single().headers["X-Bubbl-SDK-Version"])
+        assertEquals("3.0.0", requests.single().headers["X-Bubbl-SDK-Version"])
         assertEquals("android", requests.single().headers["X-Bubbl-SDK-Platform"])
         assertNotNull(requests.single().headers["Idempotency-Key"])
         assertNotNull(requests.single().headers["X-Bubbl-Install-ID"])
+    }
+
+    @Test
+    fun registerPushTokenQueuesDeviceUpdateWithRealToken() = runBlocking {
+        val requests = mutableListOf<BubblHttpRequest>()
+        val transport = BubblHttpTransport { request ->
+            requests += request
+            BubblHttpResponse(
+                statusCode = 200,
+                body = """{"success":true,"queued":true,"data":{"ingest_message_id":"1","status":"queued"}}"""
+            )
+        }
+        BubblSdk.install(storageDirectory = temporaryDirectory(), transport = transport)
+
+        BubblSdk.boot(
+            BubblConfig(
+                apiKey = "sdk-key",
+                runtimeBaseUrl = "https://runtime.test",
+                ingestBaseUrl = "https://ingest.test"
+            )
+        )
+        BubblSdk.registerPushToken("real-fcm-token")
+
+        assertEquals(0, BubblSdk.flush().pendingCount)
+        assertEquals(2, requests.size)
+        assertEquals("/api/device-data", URI(requests.first().url).path)
+        assertEquals("/api/device-registerd/create", URI(requests.last().url).path)
+        assertEquals("real-fcm-token", JSONObject(requests.last().body.orEmpty()).getString("device_token"))
     }
 
     @Test
@@ -83,12 +113,12 @@ class BubblSdkTest {
     }
 
     @Test
-    fun defaultEnvironmentEndpointsMirrorLegacySdksAndConvertPublicMetersForTransmission() = runBlocking {
+    fun defaultEnvironmentEndpointsUseRenewedSplitHostsAndConvertPublicMetersForTransmission() = runBlocking {
         val cases = listOf(
-            Triple(BubblEnvironment.Development, "nightly.api.bubbl.tech", "nightly-platform.bubbl.tech"),
-            Triple(BubblEnvironment.Nightly, "nightly.api.bubbl.tech", "nightly-platform.bubbl.tech"),
-            Triple(BubblEnvironment.Staging, "staging.api.bubbl.tech", "staging-platform.bubbl.tech"),
-            Triple(BubblEnvironment.Production, "production.api.bubbl.tech", "platform.bubbl.tech")
+            Triple(BubblEnvironment.Development, "nightly.transmission.bubbl.tech", "nightly.ingest.bubbl.tech"),
+            Triple(BubblEnvironment.Nightly, "nightly.transmission.bubbl.tech", "nightly.ingest.bubbl.tech"),
+            Triple(BubblEnvironment.Staging, "staging.transmission.bubbl.tech", "staging.ingest.bubbl.tech"),
+            Triple(BubblEnvironment.Production, "transmission.bubbl.tech", "ingest.bubbl.tech")
         )
 
         cases.forEach { (environment, expectedRuntimeHost, expectedIngestHost) ->
@@ -122,7 +152,7 @@ class BubblSdkTest {
             assertEquals(expectedIngestHost, URI(ingestRequest.url).host)
             assertEquals(1.0, runtimeBody.getDouble("distance"), 0.001)
             assertEquals("x-api-key", BubblTransportMap.runtimeAuthHeader)
-            assertEquals("ApiKey", BubblTransportMap.dashboardAuthHeader)
+            assertEquals("ApiKey", BubblTransportMap.ingestAuthHeader)
         }
     }
 
@@ -183,6 +213,56 @@ class BubblSdkTest {
         assertEquals("https://cdn.test/offer.png", payload?.media?.url)
         assertEquals("Open", payload?.cta?.label)
         assertEquals("1", payload?.survey?.questions?.single()?.id)
+    }
+
+    @Test
+    fun parsesFirebaseNotificationExtrasUsedByAutomaticNotificationLaunches() {
+        val payload = BubblNotificationPayloadParser.fromFirebasePayload(
+            payload = mapOf(
+                "gcm.n.title" to "Auto push",
+                "gcm.n.body" to "Opened from Firebase notification tray",
+                "google.message_id" to "fcm-auto-1",
+                "curated_notification_id" to "42",
+                "location_id" to "7",
+                "gcm.n.image" to "https://cdn.test/push.png"
+            )
+        )
+
+        assertNotNull(payload)
+        assertEquals("Auto push", payload?.title)
+        assertEquals("Opened from Firebase notification tray", payload?.body)
+        assertEquals("fcm-auto-1", payload?.id)
+        assertEquals("42", payload?.curatedNotificationId)
+        assertEquals("7", payload?.locationId)
+        assertEquals("https://cdn.test/push.png", payload?.media?.url)
+    }
+
+    @Test
+    fun parsesLegacyNotificationIdAliasAsCuratedNotificationId() {
+        val payload = BubblNotificationPayloadParser.fromFirebasePayload(
+            payload = mapOf(
+                "title" to "Legacy push",
+                "body" to "Uses n_id",
+                "n_id" to "42"
+            )
+        )
+
+        assertEquals("42", payload?.curatedNotificationId)
+        assertEquals("42", payload?.id)
+    }
+
+    @Test
+    fun keepsProviderNotificationIdOutOfCuratedNotificationId() {
+        val payload = BubblNotificationPayloadParser.fromFirebasePayload(
+            payload = mapOf(
+                "title" to "Provider push",
+                "body" to "Has a provider id",
+                "notification_id" to "provider-123"
+            )
+        )
+
+        assertEquals("provider-123", payload?.id)
+        assertNull(payload?.curatedNotificationId)
     }
 
     @Test
@@ -444,7 +524,9 @@ class BubblSdkTest {
 
     @Test
     fun refreshGeofenceRoutesEnterTransitionThroughNotificationEngine() = runBlocking {
+        val requests = mutableListOf<BubblHttpRequest>()
         val transport = BubblHttpTransport { request ->
+            requests += request
             val body = if (URI(request.url).path == "/api/check-geofence") {
                 geofenceRuntimeResponse()
             } else {
@@ -471,7 +553,14 @@ class BubblSdkTest {
         BubblSdk.refreshGeofence(BubblLocation(latitude = 51.50158, longitude = -0.141))
 
         assertEquals("Welcome", event.await().payload.title)
-        assertEquals(4, BubblSdk.diagnostics().pendingIngestCount)
+        assertEquals(0, BubblSdk.diagnostics().pendingIngestCount)
+        assertEquals(
+            true,
+            requests.any { request ->
+                URI(request.url).path == "/api/activities" &&
+                    JSONObject(request.body ?: "{}").optString("activity") == "notification_sent"
+            }
+        )
     }
 
     @Test
@@ -539,7 +628,9 @@ class BubblSdkTest {
 
     @Test
     fun notificationInteractionsQueueAnalyticsEvents() = runBlocking {
-        val transport = BubblHttpTransport {
+        val requests = mutableListOf<BubblHttpRequest>()
+        val transport = BubblHttpTransport { request ->
+            requests += request
             BubblHttpResponse(
                 statusCode = 200,
                 body = """{"success":true,"queued":true,"data":{"ingest_message_id":"1","status":"queued"}}"""
@@ -566,12 +657,22 @@ class BubblSdkTest {
         BubblSdk.handleNotificationMediaViewed(payload)
         BubblSdk.handleNotificationSurveyRequested(payload)
 
-        assertEquals(5, BubblSdk.diagnostics().pendingIngestCount)
+        assertEquals(3, BubblSdk.diagnostics().pendingIngestCount)
+        BubblSdk.flush()
+
+        val activities = requests
+            .filter { request -> URI(request.url).path == "/api/activities" }
+            .map { request -> JSONObject(request.body ?: "{}").optString("activity") }
+
+        assertEquals(1, activities.count { activity -> activity == "cta_engagment" })
+        assertEquals(true, activities.contains("media_viewed"))
     }
 
     @Test
     fun hostRenderedFirebaseNotificationDoesNotRequireAndroidContext() = runBlocking {
-        val transport = BubblHttpTransport {
+        val requests = mutableListOf<BubblHttpRequest>()
+        val transport = BubblHttpTransport { request ->
+            requests += request
             BubblHttpResponse(
                 statusCode = 200,
                 body = """{"success":true,"queued":true,"data":{"ingest_message_id":"1","status":"queued"}}"""
@@ -597,7 +698,113 @@ class BubblSdkTest {
         )
 
         assertEquals("Host modal", payload?.title)
-        assertEquals(1, BubblSdk.diagnostics().pendingIngestCount)
+        assertEquals(0, BubblSdk.diagnostics().pendingIngestCount)
+        assertEquals(
+            true,
+            requests.any { request ->
+                URI(request.url).path == "/api/activities" &&
+                    JSONObject(request.body ?: "{}").optString("activity") == "notification_sent"
+            }
+        )
+    }
+
+    @Test
+    fun hostRenderedFirebaseNotificationWithoutCuratedIdDoesNotHitDashboardActivityLookup() = runBlocking {
+        val requests = mutableListOf<BubblHttpRequest>()
+        val transport = BubblHttpTransport { request ->
+            requests += request
+            BubblHttpResponse(
+                statusCode = 200,
+                body = """{"success":true,"queued":true,"data":{"ingest_message_id":"1","status":"queued"}}"""
+            )
+        }
+        BubblSdk.install(storageDirectory = temporaryDirectory(), transport = transport)
+        BubblSdk.boot(
+            BubblConfig(
+                apiKey = "sdk-key",
+                runtimeBaseUrl = "https://runtime.test",
+                ingestBaseUrl = "https://ingest.test",
+                notificationRenderingMode = BubblNotificationRenderingMode.HostRendered
+            )
+        )
+
+        val payload = BubblSdk.handleFirebasePayload(
+            payload = mapOf(
+                "title" to "Host modal",
+                "body" to "Render this in the app",
+                "notification_id" to "provider-21"
+            )
+        )
+
+        assertEquals("provider-21", payload?.id)
+        assertNull(payload?.curatedNotificationId)
+        assertEquals(0, BubblSdk.diagnostics().pendingIngestCount)
+        assertEquals(
+            false,
+            requests.any { request ->
+                URI(request.url).path == "/api/activities" &&
+                    JSONObject(request.body ?: "{}").optString("activity") == "notification_sent"
+            }
+        )
+    }
+
+    @Test
+    fun defaultNotificationModalTogglePersistsForBackgroundRestores() = runBlocking {
+        val directory = temporaryDirectory()
+        val transport = BubblHttpTransport {
+            BubblHttpResponse(statusCode = 200, body = """{"success":true}""")
+        }
+
+        BubblSdk.install(storageDirectory = directory, transport = transport)
+        BubblSdk.boot(
+            BubblConfig(
+                apiKey = "sdk-key",
+                runtimeBaseUrl = "https://runtime.test",
+                ingestBaseUrl = "https://ingest.test"
+            )
+        )
+
+        BubblSdk.setDefaultNotificationModalEnabled(false)
+        assertFalse(BubblSdk.defaultNotificationModalEnabled())
+
+        BubblSdk.shutdown()
+        BubblSdk.install(storageDirectory = directory, transport = transport)
+
+        assertTrue(BubblSdk.restoreForBackground())
+        assertFalse(BubblSdk.defaultNotificationModalEnabled())
+    }
+
+    @Test
+    fun notificationOpenQueuesPendingTapWhenNoEventSubscriber() = runBlocking {
+        BubblSdk.drainPendingNotificationTaps()
+        BubblSdk.install(
+            storageDirectory = temporaryDirectory(),
+            transport = BubblHttpTransport { BubblHttpResponse(statusCode = 200, body = """{"success":true}""") }
+        )
+        BubblSdk.boot(
+            BubblConfig(
+                apiKey = "sdk-key",
+                runtimeBaseUrl = "https://runtime.test",
+                ingestBaseUrl = "https://ingest.test"
+            )
+        )
+
+        val payload = BubblNotificationPayload(
+            id = "tap-1",
+            title = "Opened",
+            body = "From tray",
+            source = BubblNotificationSource.Firebase,
+            curatedNotificationId = "42",
+            locationId = "7"
+        )
+
+        BubblSdk.handleNotificationOpen(payload, "default")
+
+        val pending = BubblSdk.drainPendingNotificationTaps()
+        assertEquals(1, pending.size)
+        assertEquals("tap-1", pending.single().payload.id)
+        assertEquals("default", pending.single().action)
+        assertTrue(BubblSdk.drainPendingNotificationTaps().isEmpty())
     }
 
     private fun temporaryDirectory(): File =
