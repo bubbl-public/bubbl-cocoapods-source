@@ -68,7 +68,8 @@ CODEMAGIC_APP_ID=...
 ```
 
 `CODEMAGIC_WORKFLOW_ID` defaults to `cocoapods-release` in `.gitlab-ci.yml`.
-The bridge job only runs for `v`-prefixed SemVer tags. A pushed GitLab tag such
-as `v3.0.1` starts the matching CocoaPods release build on Codemagic. Codemagic
-strips the leading `v`, verifies `package.json` is `3.0.1`, and publishes
-`BubblSDK 3.0.1`.
+The bridge job runs for iOS-specific release tags and full-rollout tags. A
+pushed GitLab tag such as `ios-3.0.1` starts the matching CocoaPods release
+build on Codemagic. A pushed `all-3.0.1` tag starts the iOS bridge alongside the
+other registry release lanes. Codemagic strips the release prefix, verifies
+`package.json` is `3.0.1`, and publishes `BubblSDK 3.0.1`.

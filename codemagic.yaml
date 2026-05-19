@@ -21,8 +21,10 @@ workflows:
           fi
           case "$RELEASE_TAG" in
             v*) RELEASE_VERSION="${RELEASE_TAG#v}" ;;
+            ios-*) RELEASE_VERSION="${RELEASE_TAG#ios-}" ;;
+            all-*) RELEASE_VERSION="${RELEASE_TAG#all-}" ;;
             *)
-              echo "CocoaPods check tag must look like v3.0.1 when set. Got: $RELEASE_TAG"
+              echo "CocoaPods check tag must look like v3.0.1, ios-3.0.1, or all-3.0.1 when set. Got: $RELEASE_TAG"
               exit 1
               ;;
           esac
@@ -33,7 +35,7 @@ workflows:
           {
             echo "BUBBL_RELEASE_TAG=$RELEASE_TAG"
             echo "BUBBL_RELEASE_VERSION=$RELEASE_VERSION"
-            echo "BUBBL_COCOAPODS_SOURCE_TAG=${BUBBL_COCOAPODS_SOURCE_TAG:-$RELEASE_TAG}"
+            echo "BUBBL_COCOAPODS_SOURCE_TAG=${BUBBL_COCOAPODS_SOURCE_TAG:-v$RELEASE_VERSION}"
           } >> "$CM_ENV"
       - name: Validate release config
         script: |
@@ -74,8 +76,10 @@ workflows:
           fi
           case "$RELEASE_TAG" in
             v*) RELEASE_VERSION="${RELEASE_TAG#v}" ;;
+            ios-*) RELEASE_VERSION="${RELEASE_TAG#ios-}" ;;
+            all-*) RELEASE_VERSION="${RELEASE_TAG#all-}" ;;
             *)
-              echo "CocoaPods release tag must look like v3.0.1. Got: $RELEASE_TAG"
+              echo "CocoaPods release tag must look like ios-3.0.1 or all-3.0.1. Got: $RELEASE_TAG"
               exit 1
               ;;
           esac
@@ -87,7 +91,7 @@ workflows:
           {
             echo "BUBBL_RELEASE_TAG=$RELEASE_TAG"
             echo "BUBBL_RELEASE_VERSION=$RELEASE_VERSION"
-            echo "BUBBL_COCOAPODS_SOURCE_TAG=${BUBBL_COCOAPODS_SOURCE_TAG:-$RELEASE_TAG}"
+            echo "BUBBL_COCOAPODS_SOURCE_TAG=${BUBBL_COCOAPODS_SOURCE_TAG:-v$RELEASE_VERSION}"
           } >> "$CM_ENV"
       - name: Validate release config
         script: |

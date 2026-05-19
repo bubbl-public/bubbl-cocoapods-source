@@ -113,8 +113,7 @@ android:publish:maven-central:
     - export ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="$MAVEN_CENTRAL_SIGNING_PASSWORD"
     - android/gradlew -p android publishAndReleaseToMavenCentral --no-daemon --stacktrace
   rules:
-    - if: '$CI_COMMIT_TAG'
-      when: manual
+    - if: '$CI_COMMIT_TAG =~ /^(android|all)-\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/'
   allow_failure: false
 
 ios:publish:codemagic-cocoapods:
@@ -136,11 +135,15 @@ ios:publish:codemagic-cocoapods:
         exit 1
       fi
     - |
-      release_version="${CI_COMMIT_TAG#v}"
-      if [ "$release_version" = "$CI_COMMIT_TAG" ]; then
-        echo "Codemagic CocoaPods releases must use v-prefixed tags, for example v3.0.1."
-        exit 1
-      fi
+      case "$CI_COMMIT_TAG" in
+        ios-*) release_version="${CI_COMMIT_TAG#ios-}" ;;
+        all-*) release_version="${CI_COMMIT_TAG#all-}" ;;
+        v*) release_version="${CI_COMMIT_TAG#v}" ;;
+        *)
+          echo "Codemagic CocoaPods releases must use ios-x.y.z or all-x.y.z tags."
+          exit 1
+          ;;
+      esac
 
       payload="$(printf '{"appId":"%s","workflowId":"%s","tag":"%s","labels":["gitlab","cocoapods","%s"],"environment":{"variables":{"BUBBL_RELEASE_TAG":"%s","BUBBL_RELEASE_VERSION":"%s","BUBBL_COCOAPODS_SOURCE_TAG":"%s"}}}' \
         "$CODEMAGIC_APP_ID" \
@@ -149,7 +152,7 @@ ios:publish:codemagic-cocoapods:
         "$CI_PROJECT_PATH_SLUG" \
         "$CI_COMMIT_TAG" \
         "$release_version" \
-        "$CI_COMMIT_TAG")"
+        "v$release_version")"
 
       curl --fail-with-body --show-error --silent \
         -H "Content-Type: application/json" \
@@ -157,7 +160,7 @@ ios:publish:codemagic-cocoapods:
         --data "$payload" \
         -X POST https://api.codemagic.io/builds
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/'
+    - if: '$CI_COMMIT_TAG =~ /^(ios|all)-\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/'
   allow_failure: false
 
 react-native:publish:npm:
@@ -184,8 +187,7 @@ react-native:publish:npm:
     - npm pack --dry-run
     - npm publish --access public
   rules:
-    - if: '$CI_COMMIT_TAG'
-      when: manual
+    - if: '$CI_COMMIT_TAG =~ /^(npm|all)-\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/'
   allow_failure: false
 
 flutter:publish:pub-dev:
@@ -234,6 +236,5 @@ flutter:publish:pub-dev:
       fi
     - dart pub publish --force
   rules:
-    - if: '$CI_COMMIT_TAG'
-      when: manual
+    - if: '$CI_COMMIT_TAG =~ /^(flutter|all)-\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/'
   allow_failure: false

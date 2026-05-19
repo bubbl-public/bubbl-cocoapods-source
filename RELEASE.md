@@ -26,15 +26,27 @@ Keep `BUBBL_PUBLIC_REGISTRY_RELEASE` unset unless that exposure is intended.
 
 ## Release Tag
 
-Use a tag that exactly matches the root package version:
+Use a prefixed tag for the release lane you want to run:
 
 ```bash
-git tag 3.0.1
-git push origin 3.0.1
+git tag android-3.0.1
+git push origin android-3.0.1
+
+git tag ios-3.0.1
+git push origin ios-3.0.1
+
+git tag flutter-3.0.1
+git push origin flutter-3.0.1
+
+git tag npm-3.0.1
+git push origin npm-3.0.1
+
+git tag all-3.0.1
+git push origin all-3.0.1
 ```
 
-The exact-match tag keeps the monorepo version matrix aligned from one release
-event.
+The release prefix chooses the publish lane. The version suffix must match the
+root `package.json` version so the monorepo version matrix stays aligned.
 
 ## GitHub Workflow
 

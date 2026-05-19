@@ -48,8 +48,10 @@ check('version.ios', iosPodspec.includes(`s.version = '${version}'`), 'ios/Bubbl
 const refName = process.env.GITHUB_REF_NAME ?? process.env.CI_COMMIT_TAG;
 const isTag = process.env.GITHUB_REF_TYPE === 'tag' || Boolean(process.env.CI_COMMIT_TAG);
 if (refName && isTag) {
-  const normalizedRef = refName.startsWith('v') ? refName.slice(1) : refName;
-  check('version.git-tag', normalizedRef === version, `Release tag must match package version, with optional v prefix. Tag: ${refName}; version: ${version}.`);
+  const tagMatch = refName.match(/^(?:v|android-|ios-|flutter-|npm-|all-)(.+)$/);
+  const normalizedRef = tagMatch?.[1];
+  check('version.git-tag-format', Boolean(tagMatch), `Release tag must use a supported prefix: android-, ios-, flutter-, npm-, all-, or v. Tag: ${refName}.`);
+  check('version.git-tag', normalizedRef === version, `Release tag must match package version, with a supported release prefix. Tag: ${refName}; version: ${version}.`);
 }
 
 check('android.package-space', propertyValue(androidProperties, 'GROUP') === 'tech.bubbl.sdk', 'Android must keep Maven group tech.bubbl.sdk.');
