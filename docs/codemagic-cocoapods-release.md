@@ -20,7 +20,7 @@ BUBBL_COCOAPODS_TRUNK_RELEASE=true
 Public trunk source URL:
 
 ```text
-BUBBL_COCOAPODS_SOURCE_URL=https://devops.bubbl.tech/root/bubbl-cocoapods-source.git
+BUBBL_COCOAPODS_SOURCE_URL=https://devops.bubbl.tech/bubbl-public/bubbl-cocoapods-source.git
 ```
 
 This is also the default in `scripts/cocoapods-publish.sh`. Codemagic uses this
@@ -49,7 +49,7 @@ https://devops.bubbl.tech/bubbl/renewed-sdk.git
 
 That URL is not anonymously readable, so public CocoaPods trunk consumers will not be able to resolve the pod from trunk yet. Before publishing publicly, either:
 
-- use the public source mirror at `https://devops.bubbl.tech/root/bubbl-cocoapods-source.git`, or
+- use the public source mirror at `https://devops.bubbl.tech/bubbl-public/bubbl-cocoapods-source.git`, or
 - use a private specs workflow instead of public trunk.
 
 The public source mirror has a `3.0.0` tag. The local `BubblSDK` and
