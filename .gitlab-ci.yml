@@ -19,7 +19,12 @@ contracts:check:
   stage: validate
   image: node:22-bookworm
   before_script:
-    - npm ci --cache .npm --prefer-offline
+    - |
+      if [ -f package-lock.json ]; then
+        npm ci --cache .npm --prefer-offline
+      else
+        npm install --cache .npm --prefer-offline --no-audit --no-fund
+      fi
   script:
     - npm run test:contracts
     - npm run test:wrappers
