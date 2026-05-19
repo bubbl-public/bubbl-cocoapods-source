@@ -39,8 +39,10 @@ contracts:check:
 android:check:
   stage: test
   image: mingc/android-build-box:latest
+  before_script:
+    - chmod +x android/gradlew
   script:
-    - gradle -p android testDebugUnitTest publishToMavenLocal --no-daemon --stacktrace
+    - android/gradlew -p android testDebugUnitTest publishToMavenLocal --no-daemon --stacktrace
   rules:
     - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -49,6 +51,8 @@ android:check:
 android:publish:maven-central:
   stage: publish
   image: mingc/android-build-box:latest
+  before_script:
+    - chmod +x android/gradlew
   needs:
     - contracts:check
     - android:check
@@ -70,7 +74,7 @@ android:publish:maven-central:
     - export ORG_GRADLE_PROJECT_mavenCentralUsername="$MAVEN_CENTRAL_USERNAME"
     - export ORG_GRADLE_PROJECT_mavenCentralPassword="$MAVEN_CENTRAL_PASSWORD"
     - export ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="$MAVEN_CENTRAL_SIGNING_PASSWORD"
-    - gradle -p android publishAndReleaseToMavenCentral --no-daemon --stacktrace
+    - android/gradlew -p android publishAndReleaseToMavenCentral --no-daemon --stacktrace
   rules:
     - if: '$CI_COMMIT_TAG'
       when: manual
