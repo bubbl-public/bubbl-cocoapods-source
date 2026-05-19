@@ -12,6 +12,29 @@ workflows:
       - name: Install release tooling
         script: |
           npm install --no-audit --no-fund
+      - name: Resolve release tag
+        script: |
+          RELEASE_TAG="${CM_TAG:-${BUBBL_RELEASE_TAG:-}}"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if [ -z "$RELEASE_TAG" ]; then
+            RELEASE_TAG="v$PACKAGE_VERSION"
+          fi
+          case "$RELEASE_TAG" in
+            v*) RELEASE_VERSION="${RELEASE_TAG#v}" ;;
+            *)
+              echo "CocoaPods check tag must look like v3.0.1 when set. Got: $RELEASE_TAG"
+              exit 1
+              ;;
+          esac
+          if [ "$RELEASE_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "Release tag $RELEASE_TAG resolves to $RELEASE_VERSION but package.json is $PACKAGE_VERSION."
+            exit 1
+          fi
+          {
+            echo "BUBBL_RELEASE_TAG=$RELEASE_TAG"
+            echo "BUBBL_RELEASE_VERSION=$RELEASE_VERSION"
+            echo "BUBBL_COCOAPODS_SOURCE_TAG=${BUBBL_COCOAPODS_SOURCE_TAG:-$RELEASE_TAG}"
+          } >> "$CM_ENV"
       - name: Validate release config
         script: |
           npm run release:check
@@ -42,6 +65,30 @@ workflows:
       - name: Install release tooling
         script: |
           npm install --no-audit --no-fund
+      - name: Resolve release tag
+        script: |
+          RELEASE_TAG="${CM_TAG:-${BUBBL_RELEASE_TAG:-}}"
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "CocoaPods release builds must run from a v-prefixed tag."
+            exit 1
+          fi
+          case "$RELEASE_TAG" in
+            v*) RELEASE_VERSION="${RELEASE_TAG#v}" ;;
+            *)
+              echo "CocoaPods release tag must look like v3.0.1. Got: $RELEASE_TAG"
+              exit 1
+              ;;
+          esac
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$RELEASE_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "Release tag $RELEASE_TAG resolves to $RELEASE_VERSION but package.json is $PACKAGE_VERSION."
+            exit 1
+          fi
+          {
+            echo "BUBBL_RELEASE_TAG=$RELEASE_TAG"
+            echo "BUBBL_RELEASE_VERSION=$RELEASE_VERSION"
+            echo "BUBBL_COCOAPODS_SOURCE_TAG=${BUBBL_COCOAPODS_SOURCE_TAG:-$RELEASE_TAG}"
+          } >> "$CM_ENV"
       - name: Validate release config
         script: |
           npm run release:check

@@ -4,7 +4,9 @@ set -eu
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 VERSION="$(node -p "require('./package.json').version")"
 SOURCE_URL="${BUBBL_COCOAPODS_SOURCE_URL:-https://devops.bubbl.tech/bubbl-public/bubbl-cocoapods-source.git}"
+SOURCE_TAG="${BUBBL_COCOAPODS_SOURCE_TAG:-v$VERSION}"
 REQUIRE_PUBLIC_SOURCE="${BUBBL_COCOAPODS_REQUIRE_PUBLIC_SOURCE:-true}"
+export BUBBL_COCOAPODS_SOURCE_TAG="$SOURCE_TAG"
 
 cd "$ROOT_DIR"
 
@@ -26,9 +28,9 @@ if [ -z "${COCOAPODS_TRUNK_TOKEN:-}" ]; then
 fi
 
 if [ "$REQUIRE_PUBLIC_SOURCE" != "false" ]; then
-  if ! git ls-remote "$SOURCE_URL" "refs/tags/$VERSION" >/dev/null 2>&1; then
+  if ! git ls-remote "$SOURCE_URL" "refs/tags/$SOURCE_TAG" >/dev/null 2>&1; then
     echo "CocoaPods trunk needs a publicly readable podspec source URL and tag."
-    echo "Could not read refs/tags/$VERSION from: $SOURCE_URL"
+    echo "Could not read refs/tags/$SOURCE_TAG from: $SOURCE_URL"
     echo "Set BUBBL_COCOAPODS_SOURCE_URL to the final public source URL, or set"
     echo "BUBBL_COCOAPODS_REQUIRE_PUBLIC_SOURCE=false for a private specs workflow."
     exit 1
