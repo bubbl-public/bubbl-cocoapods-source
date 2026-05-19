@@ -64,7 +64,7 @@ check('ios.source', /(github\.com\/bubbl-repo|devops\.bubbl\.tech\/bubbl)\/renew
 check('flutter.package-space', yamlValue(flutterPubspec, 'name') === 'bubbl_flutter_sdk', 'Flutter must keep pub.dev package bubbl_flutter_sdk.');
 check('flutter.publishable', !/^\s*publish_to:\s*none\s*$/m.test(flutterPubspec), 'Flutter pubspec must be publishable.');
 
-check('react-native.package-space', rnPackage.name === '@bubbl-tech/react-native-sdk', 'React Native npm package name must be @bubbl-tech/react-native-sdk.');
+check('react-native.package-space', rnPackage.name === '@bubblsdk/react-native-sdk', 'React Native npm package name must be @bubblsdk/react-native-sdk.');
 check('react-native.public', rnPackage.publishConfig?.access === 'public', 'React Native publishConfig.access must be public.');
 
 const hasGitLabCi = exists('.gitlab-ci.yml');

@@ -11,7 +11,7 @@
 | Android | `tech.bubbl.sdk:bubbl-sdk` |
 | iOS | `BubblSDK` plus legacy CocoaPods alias `Bubbl-Sdk` |
 | Flutter | `bubbl_flutter_sdk` |
-| React Native | `@bubbl-tech/react-native-sdk` |
+| React Native | `@bubblsdk/react-native-sdk` |
 
 ## Rules
 

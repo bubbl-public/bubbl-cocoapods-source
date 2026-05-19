@@ -1,5 +1,5 @@
 {
-  "name": "@bubbl-tech/react-native-sdk",
+  "name": "@bubblsdk/react-native-sdk",
   "version": "3.0.0",
   "description": "React Native wrapper for Bubbl SDK v3 native Android and iOS cores.",
   "main": "src/index.ts",

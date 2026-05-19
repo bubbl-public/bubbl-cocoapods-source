@@ -15,7 +15,7 @@ source repo cannot accidentally expose package contents.
 | iOS | Private Swift Package / private CocoaPods specs | `BubblSDK` | `ios/` |
 | iOS legacy alias | Private CocoaPods specs | `Bubbl-Sdk` | `ios/Bubbl-Sdk.podspec` |
 | Flutter | pub.dev, opt-in | `bubbl_flutter_sdk` | `flutter/` |
-| React Native | npm, opt-in | `@bubbl-tech/react-native-sdk` | `react-native/` |
+| React Native | npm, opt-in | `@bubblsdk/react-native-sdk` | `react-native/` |
 
 Already-published versions are immutable in registries. The release flow reuses
 package identities but always publishes a new SemVer version.
@@ -92,7 +92,7 @@ when public registry release is enabled.
   publishing for the existing `bubbl_flutter_sdk` package from
   `bubbl-repo/renewed-sdk`, with tag pattern `{{version}}` and package
   directory `flutter`.
-- npm: configure trusted publishing for `@bubbl-tech/react-native-sdk`, or add
+- npm: configure trusted publishing for `@bubblsdk/react-native-sdk`, or add
   `NPM_TOKEN` to the GitHub repository secrets. npm provenance is not generated
   from private GitHub repositories.
 

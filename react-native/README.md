@@ -7,13 +7,13 @@ The JavaScript facade forwards calls to the native Android and iOS SDK cores. Na
 ## Install
 
 ```bash
-npm install @bubbl-tech/react-native-sdk
+npm install @bubblsdk/react-native-sdk
 ```
 
 ## Boot
 
 ```ts
-import { Bubbl } from '@bubbl-tech/react-native-sdk';
+import { Bubbl } from '@bubblsdk/react-native-sdk';
 
 await Bubbl.boot({ apiKey: '...' });
 ```
