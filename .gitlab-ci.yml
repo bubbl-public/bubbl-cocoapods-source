@@ -6,6 +6,7 @@ stages:
 variables:
   NODE_VERSION: "22"
   GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+  PUB_CACHE: "$CI_PROJECT_DIR/.pub-cache"
   BUBBL_PUBLIC_REGISTRY_RELEASE: "false"
 
 cache:
@@ -14,6 +15,7 @@ cache:
     - .npm/
     - .gradle/caches/
     - .gradle/wrapper/
+    - .pub-cache/
 
 contracts:check:
   stage: validate
@@ -48,6 +50,20 @@ android:check:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH'
 
+flutter:check:
+  stage: test
+  image: ghcr.io/cirruslabs/flutter:stable
+  script:
+    - cd flutter
+    - flutter pub get
+    - flutter analyze
+    - flutter test
+    - flutter pub publish --dry-run
+  rules:
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+
 android:publish:maven-central:
   stage: publish
   image: mingc/android-build-box:latest
@@ -75,6 +91,56 @@ android:publish:maven-central:
     - export ORG_GRADLE_PROJECT_mavenCentralPassword="$MAVEN_CENTRAL_PASSWORD"
     - export ORG_GRADLE_PROJECT_signingInMemoryKeyPassword="$MAVEN_CENTRAL_SIGNING_PASSWORD"
     - android/gradlew -p android publishAndReleaseToMavenCentral --no-daemon --stacktrace
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: manual
+  allow_failure: false
+
+flutter:publish:pub-dev:
+  stage: publish
+  image: ghcr.io/cirruslabs/flutter:stable
+  needs:
+    - contracts:check
+    - flutter:check
+  script:
+    - |
+      if [ "$BUBBL_PUBLIC_REGISTRY_RELEASE" != "true" ]; then
+        echo "BUBBL_PUBLIC_REGISTRY_RELEASE must be true to publish public registry artifacts."
+        exit 1
+      fi
+    - cd flutter
+    - flutter pub get
+    - flutter analyze
+    - flutter test
+    - flutter pub publish --dry-run
+    - |
+      if [ -n "${PUB_DEV_GOOGLE_SERVICE_ACCOUNT_KEY_B64:-}" ]; then
+        if ! command -v gcloud >/dev/null 2>&1; then
+          apt-get update
+          apt-get install -y apt-transport-https ca-certificates curl gnupg
+          curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+            | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+            > /etc/apt/sources.list.d/google-cloud-sdk.list
+          apt-get update
+          apt-get install -y google-cloud-cli
+        fi
+
+        printf '%s' "$PUB_DEV_GOOGLE_SERVICE_ACCOUNT_KEY_B64" | base64 --decode > /tmp/pub-dev-key.json
+        gcloud auth activate-service-account --key-file=/tmp/pub-dev-key.json
+        gcloud auth print-identity-token --audiences=https://pub.dev --include-email \
+          | dart pub token add https://pub.dev
+        rm -f /tmp/pub-dev-key.json
+      elif [ -n "${PUB_DEV_CREDENTIALS_B64:-}" ]; then
+        mkdir -p "$HOME/.config/dart"
+        printf '%s' "$PUB_DEV_CREDENTIALS_B64" | base64 --decode > "$HOME/.config/dart/pub-credentials.json"
+      elif [ -n "${PUB_DEV_TOKEN:-}" ]; then
+        dart pub token add https://pub.dev --env-var PUB_DEV_TOKEN
+      else
+        echo "Missing PUB_DEV_GOOGLE_SERVICE_ACCOUNT_KEY_B64, PUB_DEV_CREDENTIALS_B64, or PUB_DEV_TOKEN."
+        exit 1
+      fi
+    - dart pub publish --force
   rules:
     - if: '$CI_COMMIT_TAG'
       when: manual
