@@ -17,15 +17,15 @@ BUBBL_PUBLIC_REGISTRY_RELEASE=true
 BUBBL_COCOAPODS_TRUNK_RELEASE=true
 ```
 
-Required before public trunk publish:
+Public trunk source URL:
 
 ```text
-BUBBL_COCOAPODS_SOURCE_URL=https://public-readable-source-url.git
+BUBBL_COCOAPODS_SOURCE_URL=https://devops.bubbl.tech/root/bubbl-cocoapods-source.git
 ```
 
-Codemagic uses this value to generate publish-ready podspecs under
-`build/cocoapods/` before linting and pushing. The checked-in podspecs remain
-unchanged.
+This is also the default in `scripts/cocoapods-publish.sh`. Codemagic uses this
+value to generate publish-ready podspecs under `build/cocoapods/` before
+linting and pushing. The checked-in podspecs remain unchanged.
 
 Optional:
 
@@ -35,10 +35,13 @@ BUBBL_COCOAPODS_REQUIRE_PUBLIC_SOURCE=true
 ```
 
 Keep `BUBBL_COCOAPODS_ALIAS_RELEASE=false` until the legacy `Bubbl-Sdk` pod ownership is available to the same trunk account.
+With the public source URL set, the check workflow only lints `Bubbl-Sdk` when
+that flag is true, because the alias depends on `BubblSDK 3.0.0` already being
+available from trunk.
 
 ## Current Blockers
 
-`ios/BubblSDK.podspec` currently points at:
+The checked-in `ios/BubblSDK.podspec` still points at the private GitLab repo:
 
 ```text
 https://devops.bubbl.tech/bubbl/renewed-sdk.git
@@ -46,7 +49,8 @@ https://devops.bubbl.tech/bubbl/renewed-sdk.git
 
 That URL is not anonymously readable, so public CocoaPods trunk consumers will not be able to resolve the pod from trunk yet. Before publishing publicly, either:
 
-- mirror the release source/tag to a public readable repo/archive and update the podspec source, or
+- use the public source mirror at `https://devops.bubbl.tech/root/bubbl-cocoapods-source.git`, or
 - use a private specs workflow instead of public trunk.
 
-The local `BubblSDK` podspec lint already passes for `3.0.0`.
+The public source mirror has a `3.0.0` tag. The local `BubblSDK` and
+`Bubbl-Sdk` podspec lints already pass for `3.0.0`.

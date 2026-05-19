@@ -3,7 +3,7 @@ set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 VERSION="$(node -p "require('./package.json').version")"
-SOURCE_URL="${BUBBL_COCOAPODS_SOURCE_URL:-https://devops.bubbl.tech/bubbl/renewed-sdk.git}"
+SOURCE_URL="${BUBBL_COCOAPODS_SOURCE_URL:-https://devops.bubbl.tech/root/bubbl-cocoapods-source.git}"
 REQUIRE_PUBLIC_SOURCE="${BUBBL_COCOAPODS_REQUIRE_PUBLIC_SOURCE:-true}"
 
 cd "$ROOT_DIR"
