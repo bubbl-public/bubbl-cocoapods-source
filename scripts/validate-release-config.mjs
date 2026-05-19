@@ -73,7 +73,7 @@ check('workflow.release', hasGitLabCi || hasGitHubRelease, 'Monorepo release wor
 
 if (hasGitLabCi) {
   const workflow = read('.gitlab-ci.yml');
-  for (const expected of ['publishAndReleaseToMavenCentral', 'BUBBL_PUBLIC_REGISTRY_RELEASE', 'MAVEN_CENTRAL_USERNAME', 'flutter pub publish', 'PUB_DEV_GOOGLE_SERVICE_ACCOUNT_KEY_B64', 'PUB_DEV_CREDENTIALS_B64']) {
+  for (const expected of ['publishAndReleaseToMavenCentral', 'BUBBL_PUBLIC_REGISTRY_RELEASE', 'MAVEN_CENTRAL_USERNAME', 'flutter pub publish', 'PUB_DEV_GOOGLE_SERVICE_ACCOUNT_KEY_B64', 'PUB_DEV_CREDENTIALS_B64', 'npm publish', 'NPM_TOKEN']) {
     check(`workflow.${expected}`, workflow.includes(expected), `GitLab CI workflow must include ${expected}.`);
   }
 }
