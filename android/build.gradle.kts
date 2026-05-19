@@ -9,7 +9,7 @@ plugins {
 }
 
 group = providers.gradleProperty("GROUP").orElse("tech.bubbl.sdk").get()
-version = providers.gradleProperty("VERSION_NAME").orElse("3.0.0").get()
+version = providers.gradleProperty("VERSION_NAME").orElse("3.0.1").get()
 
 android {
     namespace = "tech.bubbl.sdk"

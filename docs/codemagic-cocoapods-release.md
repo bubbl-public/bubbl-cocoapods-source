@@ -36,7 +36,7 @@ BUBBL_COCOAPODS_REQUIRE_PUBLIC_SOURCE=true
 
 Keep `BUBBL_COCOAPODS_ALIAS_RELEASE=false` until the legacy `Bubbl-Sdk` pod ownership is available to the same trunk account.
 With the public source URL set, the check workflow only lints `Bubbl-Sdk` when
-that flag is true, because the alias depends on `BubblSDK 3.0.0` already being
+that flag is true, because the alias depends on `BubblSDK 3.0.1` already being
 available from trunk.
 
 ## Current Blockers
@@ -52,5 +52,5 @@ That URL is not anonymously readable, so public CocoaPods trunk consumers will n
 - use the public source mirror at `https://devops.bubbl.tech/bubbl-public/bubbl-cocoapods-source.git`, or
 - use a private specs workflow instead of public trunk.
 
-The public source mirror has a `3.0.0` tag. The local `BubblSDK` and
-`Bubbl-Sdk` podspec lints already pass for `3.0.0`.
+The public source mirror has a `3.0.1` tag. The local `BubblSDK` and
+`Bubbl-Sdk` podspec lints already pass for `3.0.1`.

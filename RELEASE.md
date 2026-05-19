@@ -29,8 +29,8 @@ Keep `BUBBL_PUBLIC_REGISTRY_RELEASE` unset unless that exposure is intended.
 Use a tag that exactly matches the root package version:
 
 ```bash
-git tag 3.0.0
-git push origin 3.0.0
+git tag 3.0.1
+git push origin 3.0.1
 ```
 
 The exact-match tag keeps the monorepo version matrix aligned from one release
