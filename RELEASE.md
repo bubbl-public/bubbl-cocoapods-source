@@ -72,11 +72,13 @@ release:
 | Variable | Meaning |
 | --- | --- |
 | `BUBBL_PUBLIC_REGISTRY_RELEASE=true` | Enables Maven Central, pub.dev, and npm publish jobs on tag pushes. |
-| `BUBBL_COCOAPODS_TRUNK_RELEASE=true` | Enables CocoaPods trunk publish only when the GitHub repository is public. This remains false for the private monorepo. |
+| `BUBBL_COCOAPODS_TRUNK_RELEASE=true` | Enables CocoaPods trunk publish when the podspec source URL points at a publicly readable repo and tag. |
+| `BUBBL_COCOAPODS_SOURCE_URL` | Public git URL used inside the generated podspecs. Use the public CocoaPods source mirror, not the private monorepo. |
+| `BUBBL_COCOAPODS_ALIAS_RELEASE=true` | Also publishes the legacy `Bubbl-Sdk` alias after ownership is confirmed. Keep false until then. |
 
 The CocoaPods trunk job is separately guarded because trunk is for public specs.
-For private iOS distribution, use the private Swift Package URL or push the
-podspecs to a private specs repo with `pod repo push`.
+The workflow may live in the private monorepo, but the generated podspecs must
+reference a public source URL and tag.
 
 ## Required GitHub Secrets
 
@@ -90,16 +92,17 @@ when public registry release is enabled.
 | `MAVEN_CENTRAL_SIGNING_KEY` | Android | ASCII-armored GPG private key. |
 | `MAVEN_CENTRAL_SIGNING_KEY_B64` | Android | Optional base64 alternative to `MAVEN_CENTRAL_SIGNING_KEY`. |
 | `MAVEN_CENTRAL_SIGNING_PASSWORD` | Android | GPG key passphrase. |
-| `COCOAPODS_TRUNK_TOKEN` | CocoaPods | Only needed if trunk publishing is intentionally enabled from a public repo. |
+| `COCOAPODS_TRUNK_TOKEN` | CocoaPods | Only needed if trunk publishing is intentionally enabled. |
 | `NPM_TOKEN` | React Native | Optional if npm trusted publishing is configured; otherwise required. |
 
 ## One-Time Registry Settings
 
 - Maven Central: no new namespace verification if the existing account can
   publish `tech.bubbl.sdk`.
-- CocoaPods: private source distribution should use the private GitHub repo
-  directly via Swift Package Manager or a private CocoaPods specs repo. Do not
-  enable trunk from the private monorepo.
+- CocoaPods: trunk publishing uses generated podspecs whose source points at
+  the public CocoaPods source mirror. Private source distribution can still use
+  the private GitHub repo directly via Swift Package Manager or a private
+  CocoaPods specs repo.
 - pub.dev: if public Flutter publishing is intended, enable automated
   publishing for the existing `bubbl_flutter_sdk` package from
   `bubbl-repo/renewed-sdk`, with tag pattern `{{version}}` and package

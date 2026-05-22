@@ -91,18 +91,24 @@ if (hasCodemagic) {
 
 if (hasGitHubRelease) {
   const workflow = read('.github/workflows/sdk-release.yml');
-  for (const expected of ['publishAndReleaseToMavenCentral', 'dart-lang/setup-dart/.github/workflows/publish.yml@v1', 'pod trunk push', 'npm publish']) {
+  const cocoapodsPublish = read('scripts/cocoapods-publish.sh');
+  for (const expected of ['publishAndReleaseToMavenCentral', 'dart-lang/setup-dart/.github/workflows/publish.yml@v1', 'npm publish']) {
     check(`github-workflow.${expected}`, workflow.includes(expected), `GitHub release workflow must include ${expected}.`);
   }
+  check(
+    'github-workflow.cocoapods-publish-script',
+    workflow.includes('scripts/cocoapods-publish.sh') && cocoapodsPublish.includes('pod trunk push'),
+    'GitHub release workflow must run the CocoaPods publish script that performs pod trunk push.',
+  );
   check(
     'github-workflow.private-registry-gate',
     workflow.includes('BUBBL_PUBLIC_REGISTRY_RELEASE') && workflow.includes("needs.validate.outputs.public_registry_release == 'true'"),
     'Public registry publish jobs must be gated behind BUBBL_PUBLIC_REGISTRY_RELEASE.',
   );
   check(
-    'github-workflow.cocoapods-private-safe',
-    workflow.includes('BUBBL_COCOAPODS_TRUNK_RELEASE') && workflow.includes('github.event.repository.private'),
-    'CocoaPods trunk publish must be separately gated and disabled for private repositories.',
+    'github-workflow.cocoapods-trunk-gate',
+    workflow.includes('BUBBL_COCOAPODS_TRUNK_RELEASE') && workflow.includes('BUBBL_COCOAPODS_SOURCE_URL'),
+    'CocoaPods trunk publish must be separately gated and use an explicit public source URL.',
   );
 }
 
