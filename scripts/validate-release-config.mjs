@@ -72,20 +72,12 @@ check('react-native.public', rnPackage.publishConfig?.access === 'public', 'Reac
 
 const hasGitLabCi = exists('.gitlab-ci.yml');
 const hasGitHubRelease = exists('.github/workflows/sdk-release.yml');
-const hasCodemagic = exists('codemagic.yaml');
 check('workflow.release', hasGitLabCi || hasGitHubRelease, 'Monorepo release workflow must exist.');
 
 if (hasGitLabCi) {
   const workflow = read('.gitlab-ci.yml');
   for (const expected of ['publishAndReleaseToMavenCentral', 'BUBBL_PUBLIC_REGISTRY_RELEASE', 'MAVEN_CENTRAL_USERNAME', 'flutter pub publish', 'PUB_DEV_GOOGLE_SERVICE_ACCOUNT_KEY_B64', 'PUB_DEV_CREDENTIALS_B64', 'npm publish', 'NPM_TOKEN']) {
-    check(`workflow.${expected}`, workflow.includes(expected), `GitLab CI workflow must include ${expected}.`);
-  }
-}
-
-if (hasCodemagic) {
-  const workflow = read('codemagic.yaml') + read('scripts/cocoapods-publish.sh');
-  for (const expected of ['cocoapods-release', 'COCOAPODS_TRUNK_TOKEN', 'BUBBL_COCOAPODS_TRUNK_RELEASE', 'scripts/cocoapods-publish.sh']) {
-    check(`codemagic.${expected}`, workflow.includes(expected), `Codemagic workflow must include ${expected}.`);
+    check(`workflow.${expected}`, workflow.includes(expected), `Legacy release workflow must include ${expected}.`);
   }
 }
 

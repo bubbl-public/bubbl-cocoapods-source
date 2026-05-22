@@ -121,9 +121,3 @@ npm run readiness:strict
 The release workflow also runs the contract, wrapper, React Native, Android,
 iOS, Flutter, package dry-run, and registry configuration checks before any
 publish step.
-
-## Codemagic CocoaPods
-
-`codemagic.yaml` contains `cocoapods-check` and `cocoapods-release` workflows.
-Use the Codemagic variable group `cocoapods-release` for trunk credentials and
-release gates. Details live in `docs/codemagic-cocoapods-release.md`.

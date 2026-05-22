@@ -102,11 +102,12 @@ chmod +x android/gradlew
 android/gradlew -p android testDebugUnitTest publishToMavenLocal --no-daemon --stacktrace
 ```
 
-Public release to Maven Central is handled by GitLab CI. Push a lane tag:
+Public release to Maven Central is handled by GitHub Actions. Push a semantic
+version tag:
 
 ```bash
-git tag android-3.0.1
-git push origin android-3.0.1
+git tag 3.0.1
+git push origin 3.0.1
 ```
 
 ## iOS
@@ -133,16 +134,17 @@ sh scripts/cocoapods-lint.sh
 
 For public CocoaPods trunk publishing, the source mirror
 `bubbl-public/bubbl-cocoapods-source` must have a matching `v<version>` tag.
-GitLab triggers Codemagic for the macOS release workflow:
+GitHub Actions runs the macOS release workflow:
 
 ```bash
-git tag ios-3.0.1
-git push origin ios-3.0.1
+git tag 3.0.1
+git push origin 3.0.1
 ```
 
-Codemagic runs `cocoapods-release`, validates the tag against `package.json`,
-rewrites the generated podspec to use the public source mirror tag, and pushes
-`BubblSDK` to CocoaPods trunk.
+The release workflow validates the tag against `package.json`, builds the
+XCFramework, lints the podspecs, rewrites the generated podspec to use the
+public source mirror tag, and pushes `BubblSDK` to CocoaPods trunk when
+`BUBBL_COCOAPODS_TRUNK_RELEASE=true`.
 
 ## Flutter
 
@@ -160,11 +162,11 @@ flutter test
 flutter pub publish --dry-run
 ```
 
-Public release to pub.dev is handled by GitLab CI:
+Public release to pub.dev is handled by GitHub Actions:
 
 ```bash
-git tag flutter-3.0.1
-git push origin flutter-3.0.1
+git tag 3.0.1
+git push origin 3.0.1
 ```
 
 ## React Native
@@ -182,60 +184,50 @@ npm pack --dry-run
 npm publish --dry-run --access public
 ```
 
-Public release to npm is handled by GitLab CI:
+Public release to npm is handled by GitHub Actions:
 
 ```bash
-git tag npm-3.0.1
-git push origin npm-3.0.1
+git tag 3.0.1
+git push origin 3.0.1
 ```
 
-## Release Lanes
+## Release Tags
 
-Use a lane-specific tag when you want to publish one package:
-
-```text
-android-3.0.1   Maven Central only
-ios-3.0.1       Codemagic CocoaPods only
-flutter-3.0.1   pub.dev only
-npm-3.0.1       npm only
-```
-
-Use `all-3.0.1` only when none of that version has already been published:
+Push a semantic version tag that exactly matches `package.json`:
 
 ```bash
-git tag all-3.0.1
-git push origin all-3.0.1
+git tag 3.0.1
+git push origin 3.0.1
 ```
+
+The GitHub release workflow always runs validation and package checks. Public
+publishing runs only when the corresponding GitHub repository variables and
+secrets are configured:
+
+- `BUBBL_PUBLIC_REGISTRY_RELEASE=true` enables Maven Central, pub.dev, and npm.
+- `BUBBL_COCOAPODS_TRUNK_RELEASE=true` enables CocoaPods trunk.
+- `BUBBL_COCOAPODS_ALIAS_RELEASE=false` keeps the legacy `Bubbl-Sdk` alias off until ownership is confirmed.
 
 Public registries are immutable. Do not rerun a lane tag for a version that has
 already published successfully; bump the monorepo version instead.
 
-## CI Secrets
+## GitHub Actions Secrets
 
-GitLab project variables required for public releases:
+GitHub repository variables and secrets required for public releases:
 
 | Variable | Used by |
 | --- | --- |
 | `BUBBL_PUBLIC_REGISTRY_RELEASE=true` | Enables publish lanes |
+| `BUBBL_COCOAPODS_TRUNK_RELEASE=true` | CocoaPods trunk gate |
+| `BUBBL_COCOAPODS_SOURCE_URL` | Public CocoaPods source mirror |
+| `BUBBL_COCOAPODS_ALIAS_RELEASE=false` | Legacy alias gate |
 | `MAVEN_CENTRAL_USERNAME` | Android |
 | `MAVEN_CENTRAL_PASSWORD` | Android |
 | `MAVEN_CENTRAL_SIGNING_KEY_B64` or `MAVEN_CENTRAL_SIGNING_KEY` | Android |
 | `MAVEN_CENTRAL_SIGNING_PASSWORD` | Android |
-| `CODEMAGIC_API_TOKEN` | iOS bridge |
-| `CODEMAGIC_APP_ID` | iOS bridge |
+| `COCOAPODS_TRUNK_TOKEN` | CocoaPods |
 | `PUB_DEV_GOOGLE_SERVICE_ACCOUNT_KEY_B64` or `PUB_DEV_CREDENTIALS_B64` | Flutter |
 | `NPM_TOKEN` | React Native |
-
-Codemagic variable group `cocoapods-release` must include:
-
-```text
-COCOAPODS_TRUNK_TOKEN=...
-BUBBL_PUBLIC_REGISTRY_RELEASE=true
-BUBBL_COCOAPODS_TRUNK_RELEASE=true
-BUBBL_COCOAPODS_SOURCE_URL=https://devops.bubbl.tech/bubbl-public/bubbl-cocoapods-source.git
-BUBBL_COCOAPODS_ALIAS_RELEASE=false
-BUBBL_COCOAPODS_REQUIRE_PUBLIC_SOURCE=true
-```
 
 ## Current Status
 
