@@ -1,19 +1,15 @@
 openapi: 3.1.0
 info:
   title: Bubbl SDK v3 Contract
-  version: 3.0.1
+  version: 3.0.2
   description: >
     SDK v3 public concepts mapped to the renewed Transmission runtime paths and
     dedicated ingest service paths.
 servers:
-  - url: https://nightly.transmission.bubbl.tech
-    description: Transmission nightly runtime
   - url: https://staging.transmission.bubbl.tech
     description: Transmission staging runtime
   - url: https://transmission.bubbl.tech
     description: Transmission production runtime
-  - url: https://nightly.ingest.bubbl.tech
-    description: Ingest nightly
   - url: https://staging.ingest.bubbl.tech
     description: Ingest staging
   - url: https://ingest.bubbl.tech

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import NativeBubblSdk from './specs/NativeBubblSdk';
 
-export type BubblEnvironment = 'development' | 'nightly' | 'staging' | 'production';
+export type BubblEnvironment = 'development' | 'staging' | 'production';
 export type BubblLogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';
 export type BubblNotificationRenderingMode = 'sdkDefault' | 'hostRendered' | 'eventOnly';
 export type BubblNotificationSource = 'firebase' | 'apns' | 'runtime' | 'geofence' | 'manual';

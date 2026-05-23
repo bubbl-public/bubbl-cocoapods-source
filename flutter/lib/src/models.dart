@@ -1,4 +1,4 @@
-enum BubblEnvironment { development, nightly, staging, production }
+enum BubblEnvironment { development, staging, production }
 
 enum BubblLogLevel { off, error, warn, info, debug }
 
@@ -227,7 +227,7 @@ class BubblFlushResult {
 
 class BubblDiagnostics {
   const BubblDiagnostics({
-    this.sdkVersion = '3.0.1',
+    this.sdkVersion = '3.0.2',
     this.platform = 'flutter',
     this.booted = false,
     this.pendingIngestCount = 0,

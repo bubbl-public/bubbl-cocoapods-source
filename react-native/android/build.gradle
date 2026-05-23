@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "tech.bubbl.reactnative"
-version = "3.0.1"
+version = "3.0.2"
 
 def isNewArchitectureEnabled() {
     project.hasProperty("newArchEnabled") && project.newArchEnabled == "true"
@@ -41,6 +41,6 @@ android {
 
 dependencies {
     implementation "com.facebook.react:react-android:${reactNativeVersion}"
-    implementation "tech.bubbl.sdk:bubbl-sdk:3.0.1"
+    implementation "tech.bubbl.sdk:bubbl-sdk:3.0.2"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
 }

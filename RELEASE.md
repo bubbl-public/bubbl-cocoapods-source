@@ -29,20 +29,20 @@ Keep `BUBBL_PUBLIC_REGISTRY_RELEASE` unset unless that exposure is intended.
 Use a prefixed tag for the release lane you want to run:
 
 ```bash
-git tag android-3.0.1
-git push origin android-3.0.1
+git tag android-3.0.2
+git push origin android-3.0.2
 
-git tag ios-3.0.1
-git push origin ios-3.0.1
+git tag ios-3.0.2
+git push origin ios-3.0.2
 
-git tag flutter-3.0.1
-git push origin flutter-3.0.1
+git tag flutter-3.0.2
+git push origin flutter-3.0.2
 
-git tag npm-3.0.1
-git push origin npm-3.0.1
+git tag npm-3.0.2
+git push origin npm-3.0.2
 
-git tag all-3.0.1
-git push origin all-3.0.1
+git tag all-3.0.2
+git push origin all-3.0.2
 ```
 
 The release prefix chooses the publish lane. The version suffix must match the
@@ -105,7 +105,7 @@ when public registry release is enabled.
   CocoaPods specs repo.
 - pub.dev: if public Flutter publishing is intended, enable automated
   publishing for the existing `bubbl_flutter_sdk` package from
-  `bubbl-repo/renewed-sdk`, with tag pattern `{{version}}` and package
+  `bubbl-platform/renewed-sdk`, with tag pattern `{{version}}` and package
   directory `flutter`.
 - npm: configure trusted publishing for `@bubblsdk/react-native-sdk`, or add
   `NPM_TOKEN` to the GitHub repository secrets. npm provenance is not generated

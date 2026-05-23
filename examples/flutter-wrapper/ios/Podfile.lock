@@ -1,8 +1,8 @@
 PODS:
-  - bubbl_flutter_sdk (3.0.1):
-    - BubblSDK (= 3.0.1)
+  - bubbl_flutter_sdk (3.0.2):
+    - BubblSDK (= 3.0.2)
     - Flutter
-  - BubblSDK (3.0.1)
+  - BubblSDK (3.0.2)
   - Flutter (1.0.0)
 
 DEPENDENCIES:

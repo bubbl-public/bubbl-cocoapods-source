@@ -208,7 +208,7 @@ jobs:
           BUBBL_PUBLIC_REGISTRY_RELEASE: ${{ env.BUBBL_PUBLIC_REGISTRY_RELEASE }}
           BUBBL_COCOAPODS_TRUNK_RELEASE: ${{ env.BUBBL_COCOAPODS_TRUNK_RELEASE }}
           BUBBL_COCOAPODS_SOURCE_URL: ${{ vars.BUBBL_COCOAPODS_SOURCE_URL }}
-          BUBBL_COCOAPODS_SOURCE_TAG: v${{ needs.validate.outputs.version }}
+          BUBBL_COCOAPODS_SOURCE_TAG: ${{ needs.validate.outputs.version }}
           BUBBL_COCOAPODS_ALIAS_RELEASE: ${{ vars.BUBBL_COCOAPODS_ALIAS_RELEASE || 'false' }}
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
         run: scripts/cocoapods-publish.sh

@@ -1,18 +1,12 @@
 {
-  "contractVersion": "3.0.1",
+  "contractVersion": "3.0.2",
   "environments": {
     "development": {
-      "platformApiBaseUrl": "https://nightly.api.bubbl.tech",
-      "transmissionBaseUrl": "https://nightly.transmission.bubbl.tech",
-      "runtimeBaseUrl": "https://nightly.transmission.bubbl.tech",
-      "ingestBaseUrl": "https://nightly.ingest.bubbl.tech",
-      "legacyAlias": "nightly"
-    },
-    "nightly": {
-      "platformApiBaseUrl": "https://nightly.api.bubbl.tech",
-      "transmissionBaseUrl": "https://nightly.transmission.bubbl.tech",
-      "runtimeBaseUrl": "https://nightly.transmission.bubbl.tech",
-      "ingestBaseUrl": "https://nightly.ingest.bubbl.tech"
+      "platformApiBaseUrl": "https://staging.api.bubbl.tech",
+      "transmissionBaseUrl": "https://staging.transmission.bubbl.tech",
+      "runtimeBaseUrl": "https://staging.transmission.bubbl.tech",
+      "ingestBaseUrl": "https://staging.ingest.bubbl.tech",
+      "legacyAlias": "staging"
     },
     "staging": {
       "platformApiBaseUrl": "https://staging.api.bubbl.tech",

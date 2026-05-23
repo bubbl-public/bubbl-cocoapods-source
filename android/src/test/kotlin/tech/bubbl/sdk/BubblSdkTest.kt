@@ -50,7 +50,7 @@ class BubblSdkTest {
         assertEquals("/api/device-data", URI(requests.single().url).path)
         assertEquals("POST", requests.single().method)
         assertEquals("sdk-key", requests.single().headers["ApiKey"])
-        assertEquals("3.0.1", requests.single().headers["X-Bubbl-SDK-Version"])
+        assertEquals("3.0.2", requests.single().headers["X-Bubbl-SDK-Version"])
         assertEquals("android", requests.single().headers["X-Bubbl-SDK-Platform"])
         assertNotNull(requests.single().headers["Idempotency-Key"])
         assertNotNull(requests.single().headers["X-Bubbl-Install-ID"])
@@ -115,8 +115,7 @@ class BubblSdkTest {
     @Test
     fun defaultEnvironmentEndpointsUseRenewedSplitHostsAndConvertPublicMetersForTransmission() = runBlocking {
         val cases = listOf(
-            Triple(BubblEnvironment.Development, "nightly.transmission.bubbl.tech", "nightly.ingest.bubbl.tech"),
-            Triple(BubblEnvironment.Nightly, "nightly.transmission.bubbl.tech", "nightly.ingest.bubbl.tech"),
+            Triple(BubblEnvironment.Development, "staging.transmission.bubbl.tech", "staging.ingest.bubbl.tech"),
             Triple(BubblEnvironment.Staging, "staging.transmission.bubbl.tech", "staging.ingest.bubbl.tech"),
             Triple(BubblEnvironment.Production, "transmission.bubbl.tech", "ingest.bubbl.tech")
         )

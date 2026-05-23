@@ -6,7 +6,7 @@ Initial transport target:
 
 - Runtime: Transmission `/api/check-geofence`, `/api/check-push`, `/api/get-config`
 - Ingest: renewed Ingest SDK-compatible paths documented in `../contracts/transport-map.json`
-- Environment defaults follow the renewed split hosts. `Development` and `Nightly` use `nightly.*`, `Staging` uses `staging.*`, and `Production` uses `https://transmission.bubbl.tech` for Transmission plus `https://ingest.bubbl.tech` for ingest.
+- Environment defaults follow the renewed split hosts. `Development` and `Staging` use `staging.*`, and `Production` uses `https://transmission.bubbl.tech` for Transmission plus `https://ingest.bubbl.tech` for ingest.
 - `defaultDistanceMeters` stays public in meters; the Android transport converts it to the current Transmission v2 wire distance unit before calling `/api/check-geofence`.
 
 The alpha runtime has real transport and Android persistence wiring behind the stable public facade:

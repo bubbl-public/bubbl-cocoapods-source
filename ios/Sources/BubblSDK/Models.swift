@@ -61,7 +61,6 @@ public struct BubblConfig: Sendable, Equatable {
 
 public enum BubblEnvironment: String, Sendable, Codable {
     case development
-    case nightly
     case staging
     case production
 }
@@ -324,14 +323,14 @@ public struct BubblFlushResult: Sendable, Codable, Equatable {
 }
 
 public struct BubblDiagnostics: Sendable, Codable, Equatable {
-    public var sdkVersion = "3.0.1"
+    public var sdkVersion = "3.0.2"
     public var platform = "ios"
     public var booted = false
     public var pendingIngestCount = 0
     public var pushTokenSuffix: String?
 
     public init(
-        sdkVersion: String = "3.0.1",
+        sdkVersion: String = "3.0.2",
         platform: String = "ios",
         booted: Bool = false,
         pendingIngestCount: Int = 0,

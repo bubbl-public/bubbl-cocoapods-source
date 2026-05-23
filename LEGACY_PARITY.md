@@ -14,8 +14,7 @@ Implemented in the native cores:
 - Runtime reads: Transmission `/api/check-geofence`, `/api/check-push`, `/api/get-config`.
 - Renewed Ingest service writes through SDK-compatible paths.
 - Default endpoint resolution uses the renewed split hosts:
-  - `development` and `nightly`: `nightly.transmission.bubbl.tech` + `nightly.ingest.bubbl.tech`.
-  - `staging`: `staging.transmission.bubbl.tech` + `staging.ingest.bubbl.tech`.
+  - `development` and `staging`: `staging.transmission.bubbl.tech` + `staging.ingest.bubbl.tech`.
   - `production`: `transmission.bubbl.tech` + `ingest.bubbl.tech`.
 - Public geofence distance remains meters, with native SDKs converting to the current Transmission v2 wire distance unit before calling `/api/check-geofence`.
 - Durable ingest queue:

@@ -31,7 +31,7 @@ function assertArray(value, label) {
 const transportMap = readJson('contracts/transport-map.json');
 const openApi = fs.readFileSync(path.join(root, 'contracts/openapi.yaml'), 'utf8');
 
-assert(transportMap.contractVersion === '3.0.1', 'unexpected contract version');
+assert(transportMap.contractVersion === '3.0.2', 'unexpected contract version');
 assert(transportMap.ingest.registerDevice.path === '/api/device-registerd/create', 'Ingest service must keep the SDK device path');
 assert(transportMap.ingest.bootBatch.path === '/api/device-data', 'Ingest service must keep the SDK device-data path');
 assert(transportMap.ingest.trackGeofenceBatch.path === '/api/geofence-data', 'Ingest service must keep the SDK geofence-data path');
@@ -43,8 +43,7 @@ assert(transportMap.runtime.refreshGeofence.wireDistanceUnit === 'miles', 'refre
 assert(transportMap.runtime.refreshGeofence.wireShape === 'legacy-transmission-v2', 'refreshGeofence must document Transmission v2 wire compatibility');
 
 const expectedEnvironmentUrls = {
-  development: ['https://nightly.api.bubbl.tech', 'https://nightly.transmission.bubbl.tech', 'https://nightly.ingest.bubbl.tech'],
-  nightly: ['https://nightly.api.bubbl.tech', 'https://nightly.transmission.bubbl.tech', 'https://nightly.ingest.bubbl.tech'],
+  development: ['https://staging.api.bubbl.tech', 'https://staging.transmission.bubbl.tech', 'https://staging.ingest.bubbl.tech'],
   staging: ['https://staging.api.bubbl.tech', 'https://staging.transmission.bubbl.tech', 'https://staging.ingest.bubbl.tech'],
   production: ['https://api.bubbl.tech', 'https://transmission.bubbl.tech', 'https://ingest.bubbl.tech']
 };

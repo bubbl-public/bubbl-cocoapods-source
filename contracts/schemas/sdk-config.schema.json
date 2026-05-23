@@ -8,7 +8,7 @@
     "apiKey": { "type": "string" },
     "environment": {
       "type": "string",
-      "enum": ["development", "nightly", "staging", "production"]
+      "enum": ["development", "staging", "production"]
     },
     "transmissionBaseUrl": { "type": ["string", "null"] },
     "runtimeBaseUrl": {

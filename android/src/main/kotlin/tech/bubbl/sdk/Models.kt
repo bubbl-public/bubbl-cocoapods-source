@@ -18,7 +18,7 @@ data class BubblConfig(
     val logLevel: BubblLogLevel = BubblLogLevel.Warn
 )
 
-enum class BubblEnvironment { Development, Nightly, Staging, Production }
+enum class BubblEnvironment { Development, Staging, Production }
 enum class BubblLogLevel { Off, Error, Warn, Info, Debug }
 enum class BubblNotificationRenderingMode { SdkDefault, HostRendered, EventOnly }
 enum class BubblNotificationTapPresentation { Auto, DefaultModal, HostModal }
@@ -158,7 +158,7 @@ data class BubblNotificationTap(
 data class BubblFlushResult(val pendingCount: Int)
 
 data class BubblDiagnostics(
-    val sdkVersion: String = "3.0.1",
+    val sdkVersion: String = "3.0.2",
     val platform: String = "android",
     val booted: Boolean = false,
     val pendingIngestCount: Int = 0,

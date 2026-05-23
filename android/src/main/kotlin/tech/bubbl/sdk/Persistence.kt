@@ -172,7 +172,7 @@ internal fun BubblConfig.toJson(): JSONObject = JSONObject()
 
 internal fun bubblConfigFromJson(json: JSONObject): BubblConfig = BubblConfig(
     apiKey = json.getString("apiKey"),
-    environment = enumValueOf(json.optString("environment", BubblEnvironment.Staging.name)),
+    environment = bubblEnvironmentFromJson(json.optString("environment", BubblEnvironment.Staging.name)),
     runtimeBaseUrl = json.optNullableString("runtimeBaseUrl"),
     transmissionBaseUrl = json.optNullableString("transmissionBaseUrl"),
     ingestBaseUrl = json.optNullableString("ingestBaseUrl"),
@@ -189,6 +189,9 @@ internal fun bubblConfigFromJson(json: JSONObject): BubblConfig = BubblConfig(
     enableDefaultSurveyUi = json.optBoolean("enableDefaultSurveyUi", true),
     logLevel = enumValueOf(json.optString("logLevel", BubblLogLevel.Warn.name))
 )
+
+private fun bubblEnvironmentFromJson(value: String): BubblEnvironment =
+    runCatching { BubblEnvironment.valueOf(value) }.getOrElse { BubblEnvironment.Staging }
 
 internal fun JSONObject.optNullableString(name: String): String? =
     if (!has(name) || isNull(name)) null else optString(name)
