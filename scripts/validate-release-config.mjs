@@ -84,7 +84,7 @@ if (hasGitLabCi) {
 if (hasGitHubRelease) {
   const workflow = read('.github/workflows/sdk-release.yml');
   const cocoapodsPublish = read('scripts/cocoapods-publish.sh');
-  for (const expected of ['publishAndReleaseToMavenCentral', 'dart-lang/setup-dart/.github/workflows/publish.yml@v1', 'npm publish']) {
+  for (const expected of ['publishAndReleaseToMavenCentral', 'flutter pub publish', 'npm publish']) {
     check(`github-workflow.${expected}`, workflow.includes(expected), `GitHub release workflow must include ${expected}.`);
   }
   check(

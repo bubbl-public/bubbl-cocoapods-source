@@ -2,6 +2,15 @@ name: SDK Release
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_target:
+        description: Optional public publish target for manual runs
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - flutter
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+*'
@@ -29,6 +38,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       public_registry_release: ${{ steps.mode.outputs.public_registry_release }}
       cocoapods_trunk_release: ${{ steps.mode.outputs.cocoapods_trunk_release }}
+      publish_target: ${{ steps.mode.outputs.publish_target }}
     steps:
       - uses: actions/checkout@v4
 
@@ -51,6 +61,7 @@ jobs:
         shell: bash
         env:
           REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+          PUBLISH_TARGET: ${{ inputs.publish_target || 'all' }}
         run: |
           PUBLIC_REGISTRY_RELEASE=false
           COCOAPODS_TRUNK_RELEASE=false
@@ -59,15 +70,24 @@ jobs:
             PUBLIC_REGISTRY_RELEASE=true
           fi
 
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && \
+             [ "${PUBLISH_TARGET}" = "flutter" ] && \
+             [ "${BUBBL_PUBLIC_REGISTRY_RELEASE}" = "true" ]; then
+            PUBLIC_REGISTRY_RELEASE=true
+          fi
+
           if [ "${PUBLIC_REGISTRY_RELEASE}" = "true" ] && \
+             [ "${PUBLISH_TARGET}" != "flutter" ] && \
              [ "${BUBBL_COCOAPODS_TRUNK_RELEASE}" = "true" ]; then
             COCOAPODS_TRUNK_RELEASE=true
           fi
 
           echo "public_registry_release=${PUBLIC_REGISTRY_RELEASE}" >> "$GITHUB_OUTPUT"
           echo "cocoapods_trunk_release=${COCOAPODS_TRUNK_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "publish_target=${PUBLISH_TARGET}" >> "$GITHUB_OUTPUT"
           echo "Public registry release: ${PUBLIC_REGISTRY_RELEASE}"
           echo "CocoaPods trunk release: ${COCOAPODS_TRUNK_RELEASE}"
+          echo "Publish target: ${PUBLISH_TARGET}"
 
       - run: npm run test:contracts
       - run: npm run test:wrappers
@@ -101,7 +121,7 @@ jobs:
     needs:
       - validate
       - android-checks
-    if: needs.validate.outputs.public_registry_release == 'true'
+    if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
@@ -237,14 +257,25 @@ jobs:
     needs:
       - validate
       - flutter-checks
-    if: needs.validate.outputs.public_registry_release == 'true'
+    if: needs.validate.outputs.public_registry_release == 'true' && (needs.validate.outputs.publish_target == 'all' || needs.validate.outputs.publish_target == 'flutter')
+    runs-on: ubuntu-latest
+    environment: pub.dev
     permissions:
       contents: read
       id-token: write
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    with:
-      working-directory: flutter
-      environment: pub.dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Publish to pub.dev
+        working-directory: flutter
+        run: |
+          flutter pub get
+          flutter pub publish --dry-run
+          flutter pub publish --force
 
   react-native-pack:
     name: React Native pack
@@ -269,7 +300,7 @@ jobs:
     needs:
       - validate
       - react-native-pack
-    if: needs.validate.outputs.public_registry_release == 'true'
+    if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
     runs-on: ubuntu-latest
     environment: npm-release
     permissions:
