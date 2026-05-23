@@ -270,6 +270,8 @@ jobs:
         with:
           channel: stable
 
+      - uses: dart-lang/setup-dart@v1
+
       - name: Publish to pub.dev
         working-directory: flutter
         run: |
