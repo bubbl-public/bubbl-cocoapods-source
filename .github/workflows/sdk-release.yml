@@ -14,6 +14,7 @@ on:
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+*'
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
 
 permissions:
   contents: read
@@ -52,7 +53,8 @@ jobs:
           VERSION="$(node -p "require('./package.json').version")"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "${VERSION}" ]; then
+          REF_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${REF_VERSION}" != "${VERSION}" ]; then
             echo "Release tag '${GITHUB_REF_NAME}' must exactly match package version '${VERSION}'."
             exit 1
           fi
