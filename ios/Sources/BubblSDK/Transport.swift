@@ -63,7 +63,7 @@ public struct URLSessionBubblHTTPTransport: BubblHTTPTransport {
 }
 
 enum BubblTransportMap {
-    static let sdkVersion = "3.0.1"
+    static let sdkVersion = "3.0.2"
     static let platform = "ios"
 
     static let runtimeAuthHeader = "x-api-key"
@@ -87,9 +87,7 @@ enum BubblTransportMap {
         }
 
         switch config.environment {
-        case .development, .nightly:
-            return URL(string: "https://nightly.transmission.bubbl.tech")!
-        case .staging:
+        case .development, .staging:
             return URL(string: "https://staging.transmission.bubbl.tech")!
         case .production:
             return URL(string: "https://transmission.bubbl.tech")!
@@ -106,9 +104,7 @@ enum BubblTransportMap {
         }
 
         switch config.environment {
-        case .development, .nightly:
-            return URL(string: "https://nightly.ingest.bubbl.tech")!
-        case .staging:
+        case .development, .staging:
             return URL(string: "https://staging.ingest.bubbl.tech")!
         case .production:
             return URL(string: "https://ingest.bubbl.tech")!

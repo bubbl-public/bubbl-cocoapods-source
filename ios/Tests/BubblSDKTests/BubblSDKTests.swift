@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.0.1")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.0.2")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -119,8 +119,7 @@ final class BubblSDKTests: XCTestCase {
 
     func testDefaultEnvironmentEndpointsUseRenewedSplitHostsAndConvertPublicMetersForTransmission() async throws {
         let cases: [(BubblEnvironment, String, String)] = [
-            (.development, "nightly.transmission.bubbl.tech", "nightly.ingest.bubbl.tech"),
-            (.nightly, "nightly.transmission.bubbl.tech", "nightly.ingest.bubbl.tech"),
+            (.development, "staging.transmission.bubbl.tech", "staging.ingest.bubbl.tech"),
             (.staging, "staging.transmission.bubbl.tech", "staging.ingest.bubbl.tech"),
             (.production, "transmission.bubbl.tech", "ingest.bubbl.tech"),
         ]

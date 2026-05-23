@@ -22,7 +22,7 @@ UI for a stored payload with `try await sdk.openNotificationModal(payload)`.
 That opens the default modal without posting another device notification.
 
 Default environment endpoints follow the renewed split hosts: `.development`
-and `.nightly` use `nightly.*`, `.staging` uses `staging.*`, and `.production` uses
+and `.staging` use `staging.*`, and `.production` uses
 `https://transmission.bubbl.tech` for Transmission plus
 `https://ingest.bubbl.tech` for ingest. Public
 `defaultDistanceMeters` remains meters; the Swift transport converts it to the

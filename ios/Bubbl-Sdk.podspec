@@ -1,12 +1,12 @@
 Pod::Spec.new do |s|
   s.name = 'Bubbl-Sdk'
-  s.version = '3.0.1'
+  s.version = '3.0.2'
   s.summary = 'Compatibility CocoaPods alias for the Bubbl v3 iOS SDK.'
   s.description = 'Bubbl-Sdk keeps the legacy CocoaPods package identity available while depending on the v3 BubblSDK pod.'
   s.homepage = 'https://bubbl.tech'
   s.license = { :type => 'Commercial', :text => 'Copyright Bubbl. All rights reserved.' }
   s.author = { 'Bubbl' => 'engineering@bubbl.tech' }
-  s.source = { :git => 'https://devops.bubbl.tech/bubbl/renewed-sdk.git', :tag => s.version.to_s }
+  s.source = { :git => 'https://github.com/bubbl-public/bubbl-cocoapods-source.git', :tag => s.version.to_s }
 
   s.platform = :ios, '15.0'
   s.swift_version = '5.9'

@@ -23,8 +23,7 @@ Environment defaults follow the renewed service split:
 
 | Environment | Platform API | Transmission | Ingest |
 | --- | --- | --- | --- |
-| `development` | `https://nightly.api.bubbl.tech` | `https://nightly.transmission.bubbl.tech` | `https://nightly.ingest.bubbl.tech` |
-| `nightly` | `https://nightly.api.bubbl.tech` | `https://nightly.transmission.bubbl.tech` | `https://nightly.ingest.bubbl.tech` |
+| `development` | `https://staging.api.bubbl.tech` | `https://staging.transmission.bubbl.tech` | `https://staging.ingest.bubbl.tech` |
 | `staging` | `https://staging.api.bubbl.tech` | `https://staging.transmission.bubbl.tech` | `https://staging.ingest.bubbl.tech` |
 | `production` | `https://api.bubbl.tech` | `https://transmission.bubbl.tech` | `https://ingest.bubbl.tech` |
 
