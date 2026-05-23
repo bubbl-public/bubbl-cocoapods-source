@@ -61,7 +61,7 @@ jobs:
         shell: bash
         env:
           REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
-          PUBLISH_TARGET: ${{ inputs.publish_target || 'all' }}
+          PUBLISH_TARGET: ${{ inputs.publish_target || vars.BUBBL_SDK_RELEASE_TARGET || 'all' }}
         run: |
           PUBLIC_REGISTRY_RELEASE=false
           COCOAPODS_TRUNK_RELEASE=false
