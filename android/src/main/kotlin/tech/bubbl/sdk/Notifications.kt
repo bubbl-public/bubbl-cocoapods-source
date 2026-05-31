@@ -594,7 +594,7 @@ internal object BubblRuntimeNotificationExtractor {
         return buildList {
             for (campaignIndex in 0 until campaigns.length()) {
                 val campaign = campaigns.optJSONObject(campaignIndex) ?: continue
-                if (!campaign.optRuntimeBoolean("active", default = true)) continue
+                if (!campaign.isRuntimeCampaignEnabled()) continue
 
                 val notifications = campaign.optJSONArray("notificationsArray") ?: continue
                 for (notificationIndex in 0 until notifications.length()) {
@@ -675,6 +675,19 @@ internal object BubblRuntimeNotificationExtractor {
             is String -> value.equals("true", ignoreCase = true) || value == "1" || value.equals("yes", ignoreCase = true)
             else -> default
         }
+    }
+
+    private fun JSONObject.isRuntimeCampaignEnabled(): Boolean {
+        if (!optRuntimeBoolean("active", default = true)) return false
+        if (optRuntimeBoolean("paused", default = false)) return false
+        if (optRuntimeBoolean("campaignPaused", default = false)) return false
+        if (optRuntimeBoolean("campaign_paused", default = false)) return false
+
+        val status = firstString("status", "campaignStatus", "campaign_status")
+            ?.trim()
+            ?.lowercase()
+
+        return status !in setOf("paused", "inactive", "disabled", "ended")
     }
 
     private fun JSONObject.toStringMap(): Map<String, String> {

@@ -574,7 +574,7 @@ public enum BubblNotificationPayloadParser {
         }
 
         return campaigns.flatMap { campaign -> [BubblNotificationPayload] in
-            guard runtimeBool(campaign["active"], default: true),
+            guard campaignIsRuntimeEnabled(campaign),
                   let notifications = campaign["notificationsArray"] as? [[String: Any]] else {
                 return []
             }
@@ -688,6 +688,22 @@ public enum BubblNotificationPayloadParser {
         }
 
         return defaultValue
+    }
+
+    private static func campaignIsRuntimeEnabled(_ campaign: [String: Any]) -> Bool {
+        guard runtimeBool(campaign["active"], default: true) else { return false }
+
+        if runtimeBool(campaign["paused"], default: false) { return false }
+        if runtimeBool(campaign["campaignPaused"], default: false) { return false }
+        if runtimeBool(campaign["campaign_paused"], default: false) { return false }
+
+        if let status = firstPresent(campaign, "status", "campaignStatus", "campaign_status")?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() {
+            return !["paused", "inactive", "disabled", "ended"].contains(status)
+        }
+
+        return true
     }
 
     private static func stringValue(_ value: Any) -> String {

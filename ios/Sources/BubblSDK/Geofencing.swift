@@ -154,7 +154,7 @@ enum BubblGeofenceEngine {
         var result: [RuntimeGeofenceCampaign] = []
 
         for (campaignIndex, campaign) in campaigns.enumerated() {
-            guard runtimeBool(campaign["active"], default: true) else { continue }
+            guard campaignIsRuntimeEnabled(campaign) else { continue }
 
             let campaignId = firstPresent(campaign, "campaignId", "id")
             let campaignPolicy = objectValue(campaign["deliveryPolicy"])
@@ -399,6 +399,22 @@ enum BubblGeofenceEngine {
         }
 
         return defaultValue
+    }
+
+    private static func campaignIsRuntimeEnabled(_ campaign: [String: Any]) -> Bool {
+        guard runtimeBool(campaign["active"], default: true) else { return false }
+
+        if runtimeBool(campaign["paused"], default: false) { return false }
+        if runtimeBool(campaign["campaignPaused"], default: false) { return false }
+        if runtimeBool(campaign["campaign_paused"], default: false) { return false }
+
+        if let status = firstPresent(campaign, "status", "campaignStatus", "campaign_status")?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() {
+            return !["paused", "inactive", "disabled", "ended"].contains(status)
+        }
+
+        return true
     }
 
     private static func firstPresent(_ data: [String: Any], _ keys: String...) -> String? {

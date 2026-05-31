@@ -309,6 +309,50 @@ class BubblSdkTest {
     }
 
     @Test
+    fun ignoresPausedRuntimeCampaignNotifications() {
+        val response = """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": "paused",
+                  "campaignName": "Paused offers",
+                  "active": true,
+                  "paused": true,
+                  "locationsArray": {"locationId": 10},
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": "paused-notification",
+                      "headline": "Do not send",
+                      "body": "Paused campaign",
+                      "published": true
+                    }
+                  ]
+                },
+                {
+                  "campaignId": "status-paused",
+                  "campaignName": "Status paused offers",
+                  "active": true,
+                  "status": "paused",
+                  "locationsArray": {"locationId": 11},
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": "status-paused-notification",
+                      "headline": "Do not send either",
+                      "body": "Status paused campaign",
+                      "published": true
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.trimIndent()
+
+        assertEquals(emptyList<BubblNotificationPayload>(), BubblRuntimeNotificationExtractor.fromRuntimeResponse(response))
+    }
+
+    @Test
     fun refreshPushDispatchesRuntimeCampaignNotificationEvents() = runBlocking {
         val transport = BubblHttpTransport { request ->
             val body = if (URI(request.url).path == "/api/check-push") {
@@ -460,6 +504,74 @@ class BubblSdkTest {
         assertEquals("Goodbye", exited.notifications.single().payload.title)
         assertEquals(BubblGeofenceTransitionType.Enter, reenteredAfterCooldown.transitions.single().type)
         assertEquals(emptyList<BubblGeofenceNotificationDispatch>(), reenteredAfterCooldown.notifications)
+    }
+
+    @Test
+    fun geofenceEngineIgnoresPausedCampaigns() {
+        val response = """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": "paused",
+                  "campaignName": "Paused campaign",
+                  "active": true,
+                  "paused": true,
+                  "locationsArray": {
+                    "locationId": 10,
+                    "geofence": [
+                      { "position": 1, "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "position": 2, "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "position": 3, "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": 456,
+                      "headline": "Paused welcome",
+                      "body": "Should not send",
+                      "activation": "ON_ENTER",
+                      "published": true
+                    }
+                  ]
+                },
+                {
+                  "campaignId": "status-paused",
+                  "campaignName": "Status paused campaign",
+                  "active": true,
+                  "status": "paused",
+                  "locationsArray": {
+                    "locationId": 11,
+                    "geofence": [
+                      { "position": 1, "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "position": 2, "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "position": 3, "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": 457,
+                      "headline": "Status paused welcome",
+                      "body": "Should not send",
+                      "activation": "ON_ENTER",
+                      "published": true
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.trimIndent()
+
+        val evaluation = BubblGeofenceEngine.evaluate(
+            runtimeResponse = response,
+            location = BubblLocation(latitude = 51.50158, longitude = -0.141),
+            state = BubblGeofenceState(),
+            now = Instant.parse("2026-05-05T10:00:00Z")
+        )
+
+        assertTrue(evaluation.transitions.isEmpty())
+        assertTrue(evaluation.notifications.isEmpty())
     }
 
     @Test
@@ -903,6 +1015,50 @@ class BubblSdkTest {
                       "curatedNotificationId": "eligible-notification",
                       "headline": "Welcome",
                       "body": "Thanks for visiting",
+                      "published": true
+                    }
+                  ]
+                },
+                {
+                  "campaignId": "paused",
+                  "campaignName": "Paused campaign",
+                  "active": true,
+                  "paused": true,
+                  "locationsArray": {
+                    "locationId": "paused-location",
+                    "geofence": [
+                      { "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": "paused-notification",
+                      "headline": "Paused",
+                      "body": "Do not draw",
+                      "published": true
+                    }
+                  ]
+                },
+                {
+                  "campaignId": "status-paused",
+                  "campaignName": "Status paused campaign",
+                  "active": true,
+                  "status": "paused",
+                  "locationsArray": {
+                    "locationId": "status-paused-location",
+                    "geofence": [
+                      { "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": "status-paused-notification",
+                      "headline": "Status paused",
+                      "body": "Do not draw",
                       "published": true
                     }
                   ]

@@ -200,7 +200,7 @@ internal object BubblGeofenceEngine {
         return buildList {
             for (campaignIndex in 0 until campaigns.length()) {
                 val campaign = campaigns.optJSONObject(campaignIndex) ?: continue
-                if (!campaign.optRuntimeBoolean("active", default = true)) continue
+                if (!campaign.isRuntimeCampaignEnabled()) continue
 
                 val campaignId = campaign.firstString("campaignId", "id")
                 val campaignPolicy = campaign.optJSONObjectOrString("deliveryPolicy")
@@ -441,7 +441,7 @@ internal object BubblGeofenceSnapshotParser {
 
         for (campaignIndex in 0 until campaigns.length()) {
             val campaign = campaigns.optJSONObject(campaignIndex) ?: continue
-            if (!campaign.optRuntimeBoolean("active", default = true)) continue
+            if (!campaign.isRuntimeCampaignEnabled()) continue
             if (!hasEligibleNotification(campaign)) continue
 
             val campaignId = campaign.firstString("campaignId", "campaign_id", "id")
@@ -825,6 +825,19 @@ private fun JSONObject.optRuntimeBoolean(name: String, default: Boolean): Boolea
         is String -> value.equals("true", ignoreCase = true) || value == "1" || value.equals("yes", ignoreCase = true)
         else -> default
     }
+}
+
+private fun JSONObject.isRuntimeCampaignEnabled(): Boolean {
+    if (!optRuntimeBoolean("active", default = true)) return false
+    if (optRuntimeBoolean("paused", default = false)) return false
+    if (optRuntimeBoolean("campaignPaused", default = false)) return false
+    if (optRuntimeBoolean("campaign_paused", default = false)) return false
+
+    val status = firstString("status", "campaignStatus", "campaign_status")
+        ?.trim()
+        ?.lowercase()
+
+    return status !in setOf("paused", "inactive", "disabled", "ended")
 }
 
 private fun JSONObject.optJSONObjectOrString(name: String): JSONObject? {
