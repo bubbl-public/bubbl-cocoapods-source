@@ -393,6 +393,35 @@ class BubblSdkTest {
     }
 
     @Test
+    fun refreshGeofenceSnapshotOnlyIncludesActiveCampaignsWithEligibleNotifications() = runBlocking {
+        val transport = BubblHttpTransport {
+            BubblHttpResponse(statusCode = 200, body = geofenceRuntimeResponseWithIneligibleCampaigns())
+        }
+        BubblSdk.install(storageDirectory = temporaryDirectory(), transport = transport)
+        BubblSdk.boot(
+            BubblConfig(
+                apiKey = "sdk-key",
+                runtimeBaseUrl = "https://runtime.test",
+                ingestBaseUrl = "https://ingest.test"
+            )
+        )
+
+        val snapshotEvent = async(start = CoroutineStart.UNDISPATCHED) {
+            withTimeout(1_000) {
+                BubblSdk.events.filterIsInstance<BubblEvent.GeofenceSnapshot>().first()
+            }
+        }
+
+        BubblSdk.refreshGeofence(BubblLocation(latitude = 51.50158, longitude = -0.141))
+
+        val snapshot = snapshotEvent.await().snapshot
+        assertEquals(1, snapshot.stats.campaignsTotal)
+        assertEquals(1, snapshot.stats.polygonsTotal)
+        assertEquals("eligible", snapshot.polygons.single().campaignId)
+        assertEquals("Eligible campaign", snapshot.polygons.single().campaignName)
+    }
+
+    @Test
     fun geofenceEngineFiresEnterExitNotificationsWithCooldownAndMaximumTriggers() {
         val response = geofenceRuntimeResponse()
         val inside = BubblLocation(latitude = 51.50158, longitude = -0.141)
@@ -846,6 +875,93 @@ class BubblSdkTest {
                       "published": true
                     }
                   ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.trimIndent()
+
+    private fun geofenceRuntimeResponseWithIneligibleCampaigns(): String =
+        """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": "eligible",
+                  "campaignName": "Eligible campaign",
+                  "active": true,
+                  "locationsArray": {
+                    "locationId": "eligible-location",
+                    "geofence": [
+                      { "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": "eligible-notification",
+                      "headline": "Welcome",
+                      "body": "Thanks for visiting",
+                      "published": true
+                    }
+                  ]
+                },
+                {
+                  "campaignId": "inactive",
+                  "campaignName": "Inactive campaign",
+                  "active": false,
+                  "locationsArray": {
+                    "locationId": "inactive-location",
+                    "geofence": [
+                      { "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": "inactive-notification",
+                      "headline": "Inactive",
+                      "body": "Do not draw",
+                      "published": true
+                    }
+                  ]
+                },
+                {
+                  "campaignId": "unpublished",
+                  "campaignName": "Unpublished notification campaign",
+                  "active": true,
+                  "locationsArray": {
+                    "locationId": "unpublished-location",
+                    "geofence": [
+                      { "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": "unpublished-notification",
+                      "headline": "Unpublished",
+                      "body": "Do not draw",
+                      "published": false
+                    }
+                  ]
+                },
+                {
+                  "campaignId": "empty",
+                  "campaignName": "No notification campaign",
+                  "active": true,
+                  "locationsArray": {
+                    "locationId": "empty-location",
+                    "geofence": [
+                      { "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": []
                 }
               ],
               "pushCampaign": [],

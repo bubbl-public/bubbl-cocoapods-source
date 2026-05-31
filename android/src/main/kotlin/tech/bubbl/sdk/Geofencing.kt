@@ -442,6 +442,7 @@ internal object BubblGeofenceSnapshotParser {
         for (campaignIndex in 0 until campaigns.length()) {
             val campaign = campaigns.optJSONObject(campaignIndex) ?: continue
             if (!campaign.optRuntimeBoolean("active", default = true)) continue
+            if (!hasEligibleNotification(campaign)) continue
 
             val campaignId = campaign.firstString("campaignId", "campaign_id", "id")
             val campaignName = campaign.firstString("campaignName", "campaign_name", "name", "title")
@@ -468,6 +469,26 @@ internal object BubblGeofenceSnapshotParser {
             polygons = emptyList(),
             circles = emptyList()
         )
+
+    private fun hasEligibleNotification(campaign: JSONObject): Boolean {
+        val notifications = campaign.optJSONArray("notificationsArray") ?: return false
+
+        for (index in 0 until notifications.length()) {
+            val notification = notifications.optJSONObject(index) ?: continue
+            if (!notification.optRuntimeBoolean("published", default = true)) continue
+
+            val payload = BubblRuntimeNotificationExtractor.notificationPayload(
+                campaign = campaign,
+                notification = notification,
+                source = BubblNotificationSource.Geofence
+            )
+            if (payload != null) {
+                return true
+            }
+        }
+
+        return false
+    }
 
     private fun locationPolygons(
         campaign: JSONObject,
