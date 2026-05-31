@@ -50,7 +50,7 @@ class BubblSdkTest {
         assertEquals("/api/device-data", URI(requests.single().url).path)
         assertEquals("POST", requests.single().method)
         assertEquals("sdk-key", requests.single().headers["ApiKey"])
-        assertEquals("3.0.2", requests.single().headers["X-Bubbl-SDK-Version"])
+        assertEquals("3.0.3", requests.single().headers["X-Bubbl-SDK-Version"])
         assertEquals("android", requests.single().headers["X-Bubbl-SDK-Platform"])
         assertNotNull(requests.single().headers["Idempotency-Key"])
         assertNotNull(requests.single().headers["X-Bubbl-Install-ID"])

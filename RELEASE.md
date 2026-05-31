@@ -26,27 +26,16 @@ Keep `BUBBL_PUBLIC_REGISTRY_RELEASE` unset unless that exposure is intended.
 
 ## Release Tag
 
-Use a prefixed tag for the release lane you want to run:
+Use a version tag that exactly matches the root package version:
 
 ```bash
-git tag android-3.0.2
-git push origin android-3.0.2
-
-git tag ios-3.0.2
-git push origin ios-3.0.2
-
-git tag flutter-3.0.2
-git push origin flutter-3.0.2
-
-git tag npm-3.0.2
-git push origin npm-3.0.2
-
-git tag all-3.0.2
-git push origin all-3.0.2
+git tag v3.0.3
+git push origin v3.0.3
 ```
 
-The release prefix chooses the publish lane. The version suffix must match the
-root `package.json` version so the monorepo version matrix stays aligned.
+Tag pushes run the full release workflow. The default publish target is `all`,
+so a public registry release publishes Android, Flutter, and React Native when
+`BUBBL_PUBLIC_REGISTRY_RELEASE=true`. CocoaPods trunk remains separately gated.
 
 ## GitHub Workflow
 
