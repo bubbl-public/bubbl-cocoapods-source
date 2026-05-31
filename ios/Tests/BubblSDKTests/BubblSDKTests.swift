@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.0.2")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.0.3")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -357,6 +357,49 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(payload.cta?.label, "Open")
     }
 
+    func testIgnoresPausedRuntimeCampaignNotifications() {
+        let response = """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": "paused",
+                  "campaignName": "Paused offers",
+                  "active": true,
+                  "paused": true,
+                  "locationsArray": {"locationId": 10},
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": "paused-notification",
+                      "headline": "Do not send",
+                      "body": "Paused campaign",
+                      "published": true
+                    }
+                  ]
+                },
+                {
+                  "campaignId": "status-paused",
+                  "campaignName": "Status paused offers",
+                  "active": true,
+                  "status": "paused",
+                  "locationsArray": {"locationId": 11},
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": "status-paused-notification",
+                      "headline": "Do not send either",
+                      "body": "Status paused campaign",
+                      "published": true
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.data(using: .utf8)!
+
+        XCTAssertEqual(BubblNotificationPayloadParser.fromRuntimeResponse(response), [])
+    }
+
     func testRefreshPushDispatchesRuntimeCampaignNotifications() async throws {
         let presenter = MockNotificationPresenter()
         let transport = MockTransport { request in
@@ -459,6 +502,73 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(exited.notifications.single?.payload.title, "Goodbye")
         XCTAssertEqual(reenteredAfterCooldown.transitions.single?.type, .enter)
         XCTAssertTrue(reenteredAfterCooldown.notifications.isEmpty)
+    }
+
+    func testGeofenceEngineIgnoresPausedCampaigns() {
+        let response = """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": "paused",
+                  "campaignName": "Paused campaign",
+                  "active": true,
+                  "paused": true,
+                  "locationsArray": {
+                    "locationId": 10,
+                    "geofence": [
+                      { "position": 1, "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "position": 2, "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "position": 3, "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": 456,
+                      "headline": "Paused welcome",
+                      "body": "Should not send",
+                      "activation": "ON_ENTER",
+                      "published": true
+                    }
+                  ]
+                },
+                {
+                  "campaignId": "status-paused",
+                  "campaignName": "Status paused campaign",
+                  "active": true,
+                  "status": "paused",
+                  "locationsArray": {
+                    "locationId": 11,
+                    "geofence": [
+                      { "position": 1, "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "position": 2, "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "position": 3, "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": 457,
+                      "headline": "Status paused welcome",
+                      "body": "Should not send",
+                      "activation": "ON_ENTER",
+                      "published": true
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.data(using: .utf8)!
+
+        let evaluation = BubblGeofenceEngine.evaluate(
+            runtimeResponse: response,
+            location: BubblLocation(latitude: 51.50158, longitude: -0.141),
+            state: BubblGeofenceState(),
+            now: Date()
+        )
+
+        XCTAssertTrue(evaluation.transitions.isEmpty)
+        XCTAssertTrue(evaluation.notifications.isEmpty)
     }
 
     func testGeofenceEngineUsesNestedDeliveryPolicyAndCTASuspend() throws {
