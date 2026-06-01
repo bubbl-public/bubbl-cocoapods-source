@@ -603,6 +603,48 @@ private extension BubblGeofenceTransition {
     }
 }
 
+private extension BubblGeofenceVertex {
+    func reactMap() -> [String: Any] {
+        ["latitude": latitude, "longitude": longitude]
+    }
+}
+
+private extension BubblGeofencePolygon {
+    func reactMap() -> [String: Any] {
+        [
+            "campaignId": reactValue(campaignId),
+            "campaignName": reactValue(campaignName),
+            "locationId": reactValue(locationId),
+            "vertices": vertices.map { $0.reactMap() }
+        ]
+    }
+}
+
+private extension BubblGeofenceCircle {
+    func reactMap() -> [String: Any] {
+        [
+            "campaignId": reactValue(campaignId),
+            "campaignName": reactValue(campaignName),
+            "locationId": reactValue(locationId),
+            "center": center.reactMap(),
+            "radiusMeters": radiusMeters
+        ]
+    }
+}
+
+private extension BubblGeofenceSnapshot {
+    func reactMap() -> [String: Any] {
+        [
+            "stats": [
+                "campaignsTotal": stats.campaignsTotal,
+                "polygonsTotal": stats.polygonsTotal
+            ],
+            "polygons": polygons.map { $0.reactMap() },
+            "circles": circles.map { $0.reactMap() }
+        ]
+    }
+}
+
 private extension BubblNotificationPayload {
     func reactMap() -> [String: Any] {
         [
@@ -673,6 +715,8 @@ private extension BubblEvent {
             return ["type": "notificationSurveyRequested", "payload": payload.reactMap()]
         case .locationUpdated(let location):
             return ["type": "locationUpdated", "location": location.reactMap()]
+        case .geofenceSnapshot(let snapshot):
+            return ["type": "geofenceSnapshot", "snapshot": snapshot.reactMap()]
         case .geofenceEntered(let transition):
             return ["type": "geofenceEntered", "transition": transition.reactMap()]
         case .geofenceExited(let transition):

@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.6
+
+- Adds Flutter geofence snapshot event models and native bridge handling so host apps can render active campaign polygons consistently across Android and iOS.
+- Expands native geofence parsing to accept imported runtime aliases such as `locations`, `location`, `notifications`, and `curatedNotifications`.
+- Aligns the Flutter wrapper with the native SDK 3.0.6 release.
+
 ## 3.0.5
 
 - Android SDK notifications now create the shared `bubbl_notifications` channel at high importance, replacing an older lower-importance channel when possible so eligible notifications can appear as heads-up banners.

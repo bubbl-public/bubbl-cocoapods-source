@@ -394,6 +394,48 @@ private extension BubblGeofenceTransition {
     }
 }
 
+private extension BubblGeofenceVertex {
+    func flutterMap() -> [String: Any] {
+        ["latitude": latitude, "longitude": longitude]
+    }
+}
+
+private extension BubblGeofencePolygon {
+    func flutterMap() -> [String: Any?] {
+        [
+            "campaignId": campaignId,
+            "campaignName": campaignName,
+            "locationId": locationId,
+            "vertices": vertices.map { $0.flutterMap() }
+        ]
+    }
+}
+
+private extension BubblGeofenceCircle {
+    func flutterMap() -> [String: Any?] {
+        [
+            "campaignId": campaignId,
+            "campaignName": campaignName,
+            "locationId": locationId,
+            "center": center.flutterMap(),
+            "radiusMeters": radiusMeters
+        ]
+    }
+}
+
+private extension BubblGeofenceSnapshot {
+    func flutterMap() -> [String: Any] {
+        [
+            "stats": [
+                "campaignsTotal": stats.campaignsTotal,
+                "polygonsTotal": stats.polygonsTotal
+            ],
+            "polygons": polygons.map { $0.flutterMap() },
+            "circles": circles.map { $0.flutterMap() }
+        ]
+    }
+}
+
 private extension BubblNotificationPayload {
     func flutterMap() -> [String: Any?] {
         [
@@ -464,6 +506,8 @@ private extension BubblEvent {
             return ["type": "notificationSurveyRequested", "payload": payload.flutterMap()]
         case .locationUpdated(let location):
             return ["type": "locationUpdated", "location": location.flutterMap()]
+        case .geofenceSnapshot(let snapshot):
+            return ["type": "geofenceSnapshot", "snapshot": snapshot.flutterMap()]
         case .geofenceEntered(let transition):
             return ["type": "geofenceEntered", "transition": transition.flutterMap()]
         case .geofenceExited(let transition):

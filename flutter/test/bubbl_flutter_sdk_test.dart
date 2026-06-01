@@ -25,7 +25,7 @@ void main() {
               };
             case 'diagnostics':
               return <String, Object?>{
-                'sdkVersion': '3.0.4',
+                'sdkVersion': '3.0.6',
                 'platform': 'flutter',
                 'booted': false,
                 'pendingIngestCount': 0,
@@ -57,7 +57,7 @@ void main() {
   test('diagnostics returns scaffold platform defaults', () async {
     final diagnostics = await BubblSdk.instance.diagnostics();
 
-    expect(diagnostics.sdkVersion, '3.0.4');
+    expect(diagnostics.sdkVersion, '3.0.6');
     expect(diagnostics.platform, 'flutter');
     expect(diagnostics.booted, isFalse);
     expect(diagnostics.pushTokenSuffix, '1234567');

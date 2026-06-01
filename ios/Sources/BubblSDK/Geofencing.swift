@@ -70,6 +70,40 @@ enum BubblGeofenceEngine {
         return Array(sorted.prefix(cappedLimit))
     }
 
+    static func snapshot(runtimeResponse data: Data) -> BubblGeofenceSnapshot {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let campaigns = json["geoCampaign"] as? [[String: Any]] else {
+            return emptySnapshot()
+        }
+
+        var activeCampaignCount = 0
+        var polygons: [BubblGeofencePolygon] = []
+
+        for campaign in campaigns {
+            guard campaignIsRuntimeEnabled(campaign),
+                  hasEligibleNotification(campaign) else {
+                continue
+            }
+
+            let campaignId = firstPresent(campaign, "campaignId", "campaign_id", "id")
+            let campaignName = firstPresent(campaign, "campaignName", "campaign_name", "name", "title")
+            let campaignPolygons = snapshotPolygons(campaign, campaignId: campaignId, campaignName: campaignName)
+            guard !campaignPolygons.isEmpty else { continue }
+
+            activeCampaignCount += 1
+            polygons.append(contentsOf: campaignPolygons)
+        }
+
+        return BubblGeofenceSnapshot(
+            stats: BubblGeofenceSnapshotStats(
+                campaignsTotal: activeCampaignCount,
+                polygonsTotal: polygons.count
+            ),
+            polygons: polygons,
+            circles: polygons.compactMap(snapshotCircle)
+        )
+    }
+
     static func evaluate(
         runtimeResponse data: Data,
         location: BubblLocation,
@@ -145,6 +179,103 @@ enum BubblGeofenceEngine {
         )
     }
 
+    private static func emptySnapshot() -> BubblGeofenceSnapshot {
+        BubblGeofenceSnapshot(
+            stats: BubblGeofenceSnapshotStats(campaignsTotal: 0, polygonsTotal: 0),
+            polygons: [],
+            circles: []
+        )
+    }
+
+    private static func hasEligibleNotification(_ campaign: [String: Any]) -> Bool {
+        for notification in notificationList(campaign) {
+            guard runtimeBool(notification["published"], default: true) else { continue }
+
+            if BubblNotificationPayloadParser.runtimePayload(
+                campaign: campaign,
+                notification: notification,
+                source: .geofence
+            ) != nil {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private static func snapshotPolygons(
+        _ campaign: [String: Any],
+        campaignId: String?,
+        campaignName: String?
+    ) -> [BubblGeofencePolygon] {
+        locationObjects(campaign).compactMap {
+            snapshotPolygon($0, campaignId: campaignId, campaignName: campaignName)
+        }
+    }
+
+    private static func snapshotPolygon(
+        _ location: [String: Any],
+        campaignId: String?,
+        campaignName: String?
+    ) -> BubblGeofencePolygon? {
+        let points = location["geofence"] as? [Any]
+            ?? location["polygon"] as? [Any]
+            ?? location["coordinates"] as? [Any]
+            ?? []
+        let vertices = snapshotVertices(from: points)
+        guard vertices.count >= 3 else { return nil }
+
+        return BubblGeofencePolygon(
+            campaignId: campaignId,
+            campaignName: campaignName,
+            locationId: firstPresent(location, "locationId", "location_id", "id"),
+            vertices: vertices
+        )
+    }
+
+    private static func snapshotVertices(from points: [Any]) -> [BubblGeofenceVertex] {
+        points.compactMap { point in
+            if let dictionary = point as? [String: Any],
+               let latitude = firstDouble(dictionary, "latitude", "lat"),
+               let longitude = firstDouble(dictionary, "longitude", "lng", "lon") {
+                return BubblGeofenceVertex(latitude: latitude, longitude: longitude)
+            }
+
+            if let array = point as? [Any],
+               array.count >= 2,
+               let longitude = doubleValue(array[0]),
+               let latitude = doubleValue(array[1]) {
+                return BubblGeofenceVertex(latitude: latitude, longitude: longitude)
+            }
+
+            return nil
+        }
+    }
+
+    private static func snapshotCircle(_ polygon: BubblGeofencePolygon) -> BubblGeofenceCircle? {
+        guard !polygon.vertices.isEmpty else { return nil }
+
+        let centerLatitude = polygon.vertices.map(\.latitude).reduce(0, +) / Double(polygon.vertices.count)
+        let centerLongitude = polygon.vertices.map(\.longitude).reduce(0, +) / Double(polygon.vertices.count)
+        let center = BubblGeofenceVertex(latitude: centerLatitude, longitude: centerLongitude)
+        let radius = polygon.vertices
+            .map {
+                distanceMeters(
+                    from: BubblLocation(latitude: center.latitude, longitude: center.longitude),
+                    to: BubblLocation(latitude: $0.latitude, longitude: $0.longitude)
+                )
+            }
+            .max() ?? 0
+
+        return BubblGeofenceCircle(
+            campaignId: polygon.campaignId,
+            campaignName: polygon.campaignName,
+            locationId: polygon.locationId,
+            center: center,
+            radiusMeters: radius
+        )
+    }
+
     private static func parseCampaigns(_ json: [String: Any]) -> [RuntimeGeofenceCampaign] {
         guard let campaigns = json["geoCampaign"] as? [[String: Any]] else {
             return []
@@ -202,11 +333,7 @@ enum BubblGeofenceEngine {
         campaignCTASuspend: Bool?,
         defaults: RuntimeGeofencePolicyDefaults
     ) -> [RuntimeGeofenceNotification] {
-        guard let notifications = campaign["notificationsArray"] as? [[String: Any]] else {
-            return []
-        }
-
-        return notifications.compactMap { notification in
+        notificationList(campaign).compactMap { notification in
             guard runtimeBool(notification["published"], default: true),
                   let payload = BubblNotificationPayloadParser.runtimePayload(
                     campaign: campaign,
@@ -258,12 +385,28 @@ enum BubblGeofenceEngine {
     }
 
     private static func locationShapes(_ campaign: [String: Any]) -> [RuntimeGeofenceLocationShape] {
-        if let location = campaign["locationsArray"] as? [String: Any] {
-            return locationShape(location).map { [$0] } ?? []
+        locationObjects(campaign).compactMap(locationShape)
+    }
+
+    private static func locationObjects(_ campaign: [String: Any]) -> [[String: Any]] {
+        for key in ["locationsArray", "locations", "location"] {
+            if let location = campaign[key] as? [String: Any] {
+                return [location]
+            }
+
+            if let locations = campaign[key] as? [[String: Any]] {
+                return locations
+            }
         }
 
-        if let locations = campaign["locationsArray"] as? [[String: Any]] {
-            return locations.compactMap(locationShape)
+        return []
+    }
+
+    private static func notificationList(_ campaign: [String: Any]) -> [[String: Any]] {
+        for key in ["notificationsArray", "notifications", "curatedNotifications", "curated_notifications"] {
+            if let notifications = campaign[key] as? [[String: Any]] {
+                return notifications
+            }
         }
 
         return []

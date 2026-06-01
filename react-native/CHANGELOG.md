@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.6
+
+- Bridges iOS `geofenceSnapshot` events through the React Native wrapper so iOS map/campaign UIs receive the same active geofence snapshot as Android.
+- Expands native geofence parsing to accept imported runtime aliases such as `locations`, `location`, `notifications`, and `curatedNotifications`.
+- Aligns the React Native wrapper with the native SDK 3.0.6 release.
+
 ## 3.0.5
 
 - Android SDK notifications now create the shared `bubbl_notifications` channel at high importance, replacing an older lower-importance channel when possible so eligible notifications can appear as heads-up banners.

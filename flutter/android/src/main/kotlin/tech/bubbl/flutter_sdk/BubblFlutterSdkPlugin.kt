@@ -20,8 +20,12 @@ import tech.bubbl.sdk.BubblDiagnostics
 import tech.bubbl.sdk.BubblEnvironment
 import tech.bubbl.sdk.BubblEvent
 import tech.bubbl.sdk.BubblFlushResult
+import tech.bubbl.sdk.BubblGeofenceCircle
+import tech.bubbl.sdk.BubblGeofencePolygon
+import tech.bubbl.sdk.BubblGeofenceSnapshot
 import tech.bubbl.sdk.BubblGeofenceTransition
 import tech.bubbl.sdk.BubblGeofenceTransitionType
+import tech.bubbl.sdk.BubblGeofenceVertex
 import tech.bubbl.sdk.BubblLocation
 import tech.bubbl.sdk.BubblLogLevel
 import tech.bubbl.sdk.BubblNotificationCta
@@ -289,6 +293,32 @@ class BubblFlutterSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Ev
         "location" to location.toMap()
     )
 
+    private fun BubblGeofenceVertex.toMap(): Map<String, Any?> = mapOf("latitude" to latitude, "longitude" to longitude)
+
+    private fun BubblGeofencePolygon.toMap(): Map<String, Any?> = mapOf(
+        "campaignId" to campaignId,
+        "campaignName" to campaignName,
+        "locationId" to locationId,
+        "vertices" to vertices.map { it.toMap() }
+    )
+
+    private fun BubblGeofenceCircle.toMap(): Map<String, Any?> = mapOf(
+        "campaignId" to campaignId,
+        "campaignName" to campaignName,
+        "locationId" to locationId,
+        "center" to center.toMap(),
+        "radiusMeters" to radiusMeters
+    )
+
+    private fun BubblGeofenceSnapshot.toMap(): Map<String, Any?> = mapOf(
+        "stats" to mapOf(
+            "campaignsTotal" to stats.campaignsTotal,
+            "polygonsTotal" to stats.polygonsTotal
+        ),
+        "polygons" to polygons.map { it.toMap() },
+        "circles" to circles.map { it.toMap() }
+    )
+
     private fun BubblNotificationPayload.toMap(): Map<String, Any?> = mapOf(
         "id" to id,
         "title" to title,
@@ -334,6 +364,7 @@ class BubblFlutterSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Ev
         is BubblEvent.NotificationMediaViewed -> mapOf("type" to "notificationMediaViewed", "payload" to payload.toMap())
         is BubblEvent.NotificationSurveyRequested -> mapOf("type" to "notificationSurveyRequested", "payload" to payload.toMap())
         is BubblEvent.LocationUpdated -> mapOf("type" to "locationUpdated", "location" to location.toMap())
+        is BubblEvent.GeofenceSnapshot -> mapOf("type" to "geofenceSnapshot", "snapshot" to snapshot.toMap())
         is BubblEvent.GeofenceEntered -> mapOf("type" to "geofenceEntered", "transition" to transition.toMap())
         is BubblEvent.GeofenceExited -> mapOf("type" to "geofenceExited", "transition" to transition.toMap())
         is BubblEvent.Error -> mapOf("type" to "error", "code" to code, "message" to message)

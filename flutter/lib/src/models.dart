@@ -81,6 +81,65 @@ class BubblGeofenceTransition {
   final String? locationId;
 }
 
+class BubblGeofenceVertex {
+  const BubblGeofenceVertex({required this.latitude, required this.longitude});
+
+  final double latitude;
+  final double longitude;
+}
+
+class BubblGeofencePolygon {
+  const BubblGeofencePolygon({
+    required this.vertices,
+    this.campaignId,
+    this.campaignName,
+    this.locationId,
+  });
+
+  final String? campaignId;
+  final String? campaignName;
+  final String? locationId;
+  final List<BubblGeofenceVertex> vertices;
+}
+
+class BubblGeofenceCircle {
+  const BubblGeofenceCircle({
+    required this.center,
+    required this.radiusMeters,
+    this.campaignId,
+    this.campaignName,
+    this.locationId,
+  });
+
+  final String? campaignId;
+  final String? campaignName;
+  final String? locationId;
+  final BubblGeofenceVertex center;
+  final double radiusMeters;
+}
+
+class BubblGeofenceSnapshotStats {
+  const BubblGeofenceSnapshotStats({
+    required this.campaignsTotal,
+    required this.polygonsTotal,
+  });
+
+  final int campaignsTotal;
+  final int polygonsTotal;
+}
+
+class BubblGeofenceSnapshot {
+  const BubblGeofenceSnapshot({
+    required this.stats,
+    required this.polygons,
+    required this.circles,
+  });
+
+  final BubblGeofenceSnapshotStats stats;
+  final List<BubblGeofencePolygon> polygons;
+  final List<BubblGeofenceCircle> circles;
+}
+
 class BubblConfiguration {
   const BubblConfiguration({
     required this.notificationsCount,
@@ -227,7 +286,7 @@ class BubblFlushResult {
 
 class BubblDiagnostics {
   const BubblDiagnostics({
-    this.sdkVersion = '3.0.4',
+    this.sdkVersion = '3.0.6',
     this.platform = 'flutter',
     this.booted = false,
     this.pendingIngestCount = 0,
@@ -297,6 +356,12 @@ class BubblLocationUpdatedEvent extends BubblEvent {
   const BubblLocationUpdatedEvent(this.location);
 
   final BubblLocation location;
+}
+
+class BubblGeofenceSnapshotEvent extends BubblEvent {
+  const BubblGeofenceSnapshotEvent(this.snapshot);
+
+  final BubblGeofenceSnapshot snapshot;
 }
 
 class BubblGeofenceEnteredEvent extends BubblEvent {

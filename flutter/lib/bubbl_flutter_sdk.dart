@@ -289,6 +289,9 @@ List<String> _stringList(Object? value) => (value as List? ?? const <Object?>[])
     .map((item) => item.toString())
     .toList();
 
+List<Map<String, Object?>> _mapList(Object? value) =>
+    (value as List? ?? const <Object?>[]).map(_asMap).toList();
+
 int _int(Object? value) => value is num ? value.toInt() : 0;
 double _double(Object? value) => value is num ? value.toDouble() : 0;
 bool _bool(Object? value) => value == true;
@@ -320,7 +323,7 @@ BubblConfiguration _configurationFromMap(Map<String, Object?> map) =>
 
 BubblDiagnostics _diagnosticsFromMap(Map<String, Object?> map) =>
     BubblDiagnostics(
-      sdkVersion: map['sdkVersion']?.toString() ?? '3.0.4',
+      sdkVersion: map['sdkVersion']?.toString() ?? '3.0.6',
       platform: map['platform']?.toString() ?? 'flutter',
       booted: _bool(map['booted']),
       pendingIngestCount: _int(map['pendingIngestCount']),
@@ -342,6 +345,39 @@ BubblGeofenceTransition _transitionFromMap(Map<String, Object?> map) =>
       campaignId: _stringOrNull(map['campaignId']),
       locationId: _stringOrNull(map['locationId']),
       location: _locationFromMap(_asMap(map['location'])),
+    );
+
+BubblGeofenceVertex _geofenceVertexFromMap(Map<String, Object?> map) =>
+    BubblGeofenceVertex(
+      latitude: _double(map['latitude']),
+      longitude: _double(map['longitude']),
+    );
+
+BubblGeofencePolygon _geofencePolygonFromMap(Map<String, Object?> map) =>
+    BubblGeofencePolygon(
+      campaignId: _stringOrNull(map['campaignId']),
+      campaignName: _stringOrNull(map['campaignName']),
+      locationId: _stringOrNull(map['locationId']),
+      vertices: _mapList(map['vertices']).map(_geofenceVertexFromMap).toList(),
+    );
+
+BubblGeofenceCircle _geofenceCircleFromMap(Map<String, Object?> map) =>
+    BubblGeofenceCircle(
+      campaignId: _stringOrNull(map['campaignId']),
+      campaignName: _stringOrNull(map['campaignName']),
+      locationId: _stringOrNull(map['locationId']),
+      center: _geofenceVertexFromMap(_asMap(map['center'])),
+      radiusMeters: _double(map['radiusMeters']),
+    );
+
+BubblGeofenceSnapshot _geofenceSnapshotFromMap(Map<String, Object?> map) =>
+    BubblGeofenceSnapshot(
+      stats: BubblGeofenceSnapshotStats(
+        campaignsTotal: _int(_asMap(map['stats'])['campaignsTotal']),
+        polygonsTotal: _int(_asMap(map['stats'])['polygonsTotal']),
+      ),
+      polygons: _mapList(map['polygons']).map(_geofencePolygonFromMap).toList(),
+      circles: _mapList(map['circles']).map(_geofenceCircleFromMap).toList(),
     );
 
 BubblNotificationPayload _notificationPayloadFromMap(
@@ -454,6 +490,10 @@ BubblEvent _eventFromMap(Map<String, Object?> map) {
     case 'locationUpdated':
       return BubblLocationUpdatedEvent(
         _locationFromMap(_asMap(map['location'])),
+      );
+    case 'geofenceSnapshot':
+      return BubblGeofenceSnapshotEvent(
+        _geofenceSnapshotFromMap(_asMap(map['snapshot'])),
       );
     case 'geofenceEntered':
       return BubblGeofenceEnteredEvent(

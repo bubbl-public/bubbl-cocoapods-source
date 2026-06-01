@@ -247,9 +247,9 @@ internal object BubblGeofenceEngine {
         campaignCtaSuspend: Boolean?,
         defaults: RuntimeGeofencePolicyDefaults
     ): List<RuntimeGeofenceNotification> {
-        val notifications = campaign.optJSONArray("notificationsArray") ?: return emptyList()
-
         return buildList {
+            val notifications = campaign.firstJSONArray("notificationsArray", "notifications", "curatedNotifications", "curated_notifications")
+                ?: return@buildList
             for (index in 0 until notifications.length()) {
                 val notification = notifications.optJSONObject(index) ?: continue
                 if (!notification.optRuntimeBoolean("published", default = true)) continue
@@ -304,18 +304,9 @@ internal object BubblGeofenceEngine {
     }
 
     private fun locationShapes(campaign: JSONObject): List<RuntimeGeofenceLocationShape> {
-        val locationsArray = campaign.opt("locationsArray")
-
-        return when (locationsArray) {
-            is JSONObject -> listOfNotNull(locationShape(locationsArray))
-            is JSONArray -> buildList {
-                for (index in 0 until locationsArray.length()) {
-                    val location = locationsArray.optJSONObject(index) ?: continue
-                    locationShape(location)?.let(::add)
-                }
-            }
-            else -> emptyList()
-        }
+        return campaign
+            .firstJSONObjectList("locationsArray", "locations", "location")
+            .mapNotNull(::locationShape)
     }
 
     private fun locationShape(json: JSONObject): RuntimeGeofenceLocationShape? {
@@ -471,7 +462,8 @@ internal object BubblGeofenceSnapshotParser {
         )
 
     private fun hasEligibleNotification(campaign: JSONObject): Boolean {
-        val notifications = campaign.optJSONArray("notificationsArray") ?: return false
+        val notifications = campaign.firstJSONArray("notificationsArray", "notifications", "curatedNotifications", "curated_notifications")
+            ?: return false
 
         for (index in 0 until notifications.length()) {
             val notification = notifications.optJSONObject(index) ?: continue
@@ -495,18 +487,9 @@ internal object BubblGeofenceSnapshotParser {
         campaignId: String?,
         campaignName: String?
     ): List<BubblGeofencePolygon> {
-        val locationsArray = campaign.opt("locationsArray")
-
-        return when (locationsArray) {
-            is JSONObject -> listOfNotNull(locationPolygon(locationsArray, campaignId, campaignName))
-            is JSONArray -> buildList {
-                for (index in 0 until locationsArray.length()) {
-                    val location = locationsArray.optJSONObject(index) ?: continue
-                    locationPolygon(location, campaignId, campaignName)?.let(::add)
-                }
-            }
-            else -> emptyList()
-        }
+        return campaign
+            .firstJSONObjectList("locationsArray", "locations", "location")
+            .mapNotNull { locationPolygon(it, campaignId, campaignName) }
     }
 
     private fun locationPolygon(
@@ -847,6 +830,24 @@ private fun JSONObject.optJSONObjectOrString(name: String): JSONObject? {
         is String -> runCatching { JSONObject(value) }.getOrNull()
         else -> null
     }
+}
+
+private fun JSONObject.firstJSONArray(vararg keys: String): JSONArray? =
+    keys.firstNotNullOfOrNull { key -> optJSONArray(key) }
+
+private fun JSONObject.firstJSONObjectList(vararg keys: String): List<JSONObject> {
+    for (key in keys) {
+        when (val value = opt(key)) {
+            is JSONObject -> return listOf(value)
+            is JSONArray -> return buildList {
+                for (index in 0 until value.length()) {
+                    value.optJSONObject(index)?.let(::add)
+                }
+            }
+        }
+    }
+
+    return emptyList()
 }
 
 private fun JSONObject.firstString(vararg keys: String): String? =
