@@ -44,6 +44,190 @@ scripts/        Repository validation scripts
 docs/           Runtime strategy notes
 ```
 
+## Local Setup
+
+Required tooling:
+
+- Node.js 22+
+- JDK 17+
+- Android SDK and Gradle wrapper support
+- Xcode with Swift Package Manager and CocoaPods 1.16+
+- Flutter stable
+
+Install JavaScript dependencies from the repo root:
+
+```bash
+npm install
+```
+
+The repo is version-locked as a monorepo. The root `package.json`,
+`android/gradle.properties`, `ios/*.podspec`, `flutter/pubspec.yaml`, and
+`react-native/package.json` must all agree on the same SemVer version.
+
+## Validate Everything
+
+Fast cross-platform validation:
+
+```bash
+npm run test:contracts
+npm run test:wrappers
+npm run test:rn
+npm run release:check
+npm run readiness
+```
+
+Full local validation, where native tooling is available:
+
+```bash
+npm run test:local
+```
+
+Strict readiness is intentionally tougher and is useful before a public release:
+
+```bash
+npm run readiness:strict
+```
+
+## Android
+
+Source: `android/`
+
+Package: `tech.bubbl.sdk:bubbl-sdk`
+
+Build, test, and publish to local Maven:
+
+```bash
+chmod +x android/gradlew
+android/gradlew -p android testDebugUnitTest publishToMavenLocal --no-daemon --stacktrace
+```
+
+Public release to Maven Central is handled by GitHub Actions. Push a semantic
+version tag:
+
+```bash
+git tag 3.0.4
+git push origin 3.0.4
+```
+
+## iOS
+
+Source: `ios/`
+
+Packages:
+
+- Swift Package product: `BubblSDK`
+- CocoaPods trunk pod: `BubblSDK`
+- Legacy alias podspec: `Bubbl-Sdk`
+
+Run Swift tests:
+
+```bash
+swift test --package-path ios --scratch-path /tmp/bubbl-renewed-sdk-ios-build
+```
+
+Lint CocoaPods locally against the checked-in private source:
+
+```bash
+sh scripts/cocoapods-lint.sh
+```
+
+For public CocoaPods trunk publishing, the source mirror
+`bubbl-public/bubbl-cocoapods-source` must have a matching `v<version>` tag.
+GitHub Actions runs the macOS release workflow:
+
+```bash
+git tag 3.0.4
+git push origin 3.0.4
+```
+
+The release workflow validates the tag against `package.json`, builds the
+XCFramework, lints the podspecs, rewrites the generated podspec to use the
+public source mirror tag, and pushes `BubblSDK` to CocoaPods trunk when
+`BUBBL_COCOAPODS_TRUNK_RELEASE=true`.
+
+## Flutter
+
+Source: `flutter/`
+
+Package: `bubbl_flutter_sdk`
+
+Analyze, test, and dry-run locally:
+
+```bash
+cd flutter
+flutter pub get
+flutter analyze
+flutter test
+flutter pub publish --dry-run
+```
+
+Public release to pub.dev is handled by GitHub Actions:
+
+```bash
+git tag 3.0.4
+git push origin 3.0.4
+```
+
+## React Native
+
+Source: `react-native/`
+
+Package: `@bubblsdk/react-native-sdk`
+
+Validate wrapper surface and package contents:
+
+```bash
+npm run test:rn
+cd react-native
+npm pack --dry-run
+npm publish --dry-run --access public
+```
+
+Public release to npm is handled by GitHub Actions:
+
+```bash
+git tag 3.0.4
+git push origin 3.0.4
+```
+
+## Release Tags
+
+Push a semantic version tag that exactly matches `package.json`:
+
+```bash
+git tag 3.0.4
+git push origin 3.0.4
+```
+
+The GitHub release workflow always runs validation and package checks. Public
+publishing runs only when the corresponding GitHub repository variables and
+secrets are configured:
+
+- `BUBBL_PUBLIC_REGISTRY_RELEASE=true` enables Maven Central, pub.dev, and npm.
+- `BUBBL_COCOAPODS_TRUNK_RELEASE=true` enables CocoaPods trunk.
+- `BUBBL_COCOAPODS_ALIAS_RELEASE=false` keeps the legacy `Bubbl-Sdk` alias off until ownership is confirmed.
+
+Public registries are immutable. Do not rerun a lane tag for a version that has
+already published successfully; bump the monorepo version instead.
+
+## GitHub Actions Secrets
+
+GitHub repository variables and secrets required for public releases:
+
+| Variable | Used by |
+| --- | --- |
+| `BUBBL_PUBLIC_REGISTRY_RELEASE=true` | Enables publish lanes |
+| `BUBBL_COCOAPODS_TRUNK_RELEASE=true` | CocoaPods trunk gate |
+| `BUBBL_COCOAPODS_SOURCE_URL` | Public CocoaPods source mirror |
+| `BUBBL_COCOAPODS_ALIAS_RELEASE=false` | Legacy alias gate |
+| `MAVEN_CENTRAL_USERNAME` | Android |
+| `MAVEN_CENTRAL_PASSWORD` | Android |
+| `MAVEN_CENTRAL_SIGNING_KEY_B64` or `MAVEN_CENTRAL_SIGNING_KEY` | Android |
+| `MAVEN_CENTRAL_SIGNING_PASSWORD` | Android |
+| `COCOAPODS_TRUNK_TOKEN` | CocoaPods |
+| `PUB_DEV_GOOGLE_SERVICE_ACCOUNT_KEY_B64` or `PUB_DEV_CREDENTIALS_B64` | Flutter |
+| `NPM_TOKEN` | React Native |
+
 ## Current Status
 
 This is the beta candidate foundation:
