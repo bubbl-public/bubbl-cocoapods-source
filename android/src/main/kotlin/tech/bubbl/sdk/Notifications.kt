@@ -2,6 +2,7 @@ package tech.bubbl.sdk
 
 import android.Manifest
 import android.app.Activity
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -929,10 +930,23 @@ internal object BubblAndroidNotificationRuntime {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
         val manager = context.getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(channelId) != null) return
+        val existing = manager.getNotificationChannel(channelId)
+        if (existing != null) {
+            if (existing.importance != NotificationManager.IMPORTANCE_NONE &&
+                existing.importance < NotificationManager.IMPORTANCE_HIGH
+            ) {
+                manager.deleteNotificationChannel(channelId)
+            } else {
+                return
+            }
+        }
 
         manager.createNotificationChannel(
-            NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Campaign and location notifications from Bubbl."
+                enableVibration(true)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
         )
     }
 

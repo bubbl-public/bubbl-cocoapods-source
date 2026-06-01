@@ -19,6 +19,13 @@ final class BubblSdk: RCTEventEmitter {
         false
     }
 
+    override init() {
+        super.init()
+        Task { @MainActor in
+            BubblNotificationCenterDelegate.installDefault()
+        }
+    }
+
     override func supportedEvents() -> [String]! {
         [Self.eventName]
     }

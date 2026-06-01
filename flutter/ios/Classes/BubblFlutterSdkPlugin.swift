@@ -16,6 +16,10 @@ public final class BubblFlutterSdkPlugin: NSObject, FlutterPlugin, FlutterStream
     #endif
 
     public static func register(with registrar: FlutterPluginRegistrar) {
+        Task { @MainActor in
+            BubblNotificationCenterDelegate.installDefault()
+        }
+
         let instance = BubblFlutterSdkPlugin()
         let methodChannel = FlutterMethodChannel(
             name: "tech.bubbl.sdk/flutter/methods",

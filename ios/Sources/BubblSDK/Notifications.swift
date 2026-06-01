@@ -198,6 +198,8 @@ private enum BubblNotificationCategory {
 }
 
 public final class BubblNotificationCenterDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    @MainActor private static var installedDelegate: BubblNotificationCenterDelegate?
+
     private let sdk: BubblClient
     private let autoFlush: Bool
 
@@ -205,6 +207,19 @@ public final class BubblNotificationCenterDelegate: NSObject, UNUserNotification
         self.sdk = sdk
         self.autoFlush = autoFlush
         super.init()
+    }
+
+    @MainActor
+    @discardableResult
+    public static func installDefault(
+        center: UNUserNotificationCenter = .current(),
+        sdk: BubblClient = .shared,
+        autoFlush: Bool = true
+    ) -> BubblNotificationCenterDelegate {
+        let delegate = BubblNotificationCenterDelegate(sdk: sdk, autoFlush: autoFlush)
+        installedDelegate = delegate
+        center.delegate = delegate
+        return delegate
     }
 
     public func userNotificationCenter(

@@ -1,9 +1,11 @@
 # Changelog
 
-## 3.0.3
+## 3.0.4
 
+- Android SDK notifications now create the shared `bubbl_notifications` channel at high importance, replacing an older lower-importance channel when possible so eligible notifications can appear as heads-up banners.
+- iOS installs a retained default `UNUserNotificationCenterDelegate` from the Flutter wrapper so foreground notifications use banner/list presentation and taps are forwarded to the SDK.
 - Filters paused and inactive runtime campaigns before they can surface through geofence or notification handling.
-- Aligns the Flutter wrapper with the native SDK 3.0.3 release.
+- Aligns the Flutter wrapper with the native SDK 3.0.4 release.
 
 ## 3.0.2
 

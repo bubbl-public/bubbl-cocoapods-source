@@ -158,7 +158,7 @@ data class BubblNotificationTap(
 data class BubblFlushResult(val pendingCount: Int)
 
 data class BubblDiagnostics(
-    val sdkVersion: String = "3.0.3",
+    val sdkVersion: String = "3.0.4",
     val platform: String = "android",
     val booted: Boolean = false,
     val pendingIngestCount: Int = 0,
