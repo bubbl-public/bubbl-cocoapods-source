@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.0.4")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.0.6")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -502,6 +502,66 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(exited.notifications.single?.payload.title, "Goodbye")
         XCTAssertEqual(reenteredAfterCooldown.transitions.single?.type, .enter)
         XCTAssertTrue(reenteredAfterCooldown.notifications.isEmpty)
+    }
+
+    func testGeofenceSnapshotIncludesActiveCampaignPolygons() {
+        let snapshot = BubblGeofenceEngine.snapshot(runtimeResponse: geofenceRuntimeResponse())
+
+        XCTAssertEqual(snapshot.stats.campaignsTotal, 1)
+        XCTAssertEqual(snapshot.stats.polygonsTotal, 1)
+        XCTAssertEqual(snapshot.polygons.single?.campaignId, "123")
+        XCTAssertEqual(snapshot.polygons.single?.campaignName, "Spring offers")
+        XCTAssertEqual(snapshot.polygons.single?.locationId, "10")
+        XCTAssertEqual(snapshot.polygons.single?.vertices.count, 3)
+        XCTAssertEqual(snapshot.circles.single?.campaignId, "123")
+    }
+
+    func testGeofenceSnapshotAcceptsImportedLocationAndNotificationAliases() {
+        let response = """
+            {
+              "geoCampaign": [
+                {
+                  "id": "travel-demo",
+                  "name": "Travel demo",
+                  "active": true,
+                  "locations": [
+                    {
+                      "id": "london",
+                      "polygon": [
+                        [-0.140112, 51.501476],
+                        [-0.141000, 51.501800],
+                        [-0.142000, 51.501476]
+                      ]
+                    }
+                  ],
+                  "notifications": [
+                    {
+                      "curatedNotificationId": 456,
+                      "headline": "Travel welcome",
+                      "body": "Thanks for visiting",
+                      "published": true
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.data(using: .utf8)!
+
+        let snapshot = BubblGeofenceEngine.snapshot(runtimeResponse: response)
+        let evaluation = BubblGeofenceEngine.evaluate(
+            runtimeResponse: response,
+            location: BubblLocation(latitude: 51.50158, longitude: -0.141),
+            state: BubblGeofenceState(),
+            now: Date()
+        )
+
+        XCTAssertEqual(snapshot.stats.campaignsTotal, 1)
+        XCTAssertEqual(snapshot.polygons.single?.campaignId, "travel-demo")
+        XCTAssertEqual(snapshot.polygons.single?.campaignName, "Travel demo")
+        XCTAssertEqual(snapshot.polygons.single?.locationId, "london")
+        XCTAssertEqual(evaluation.notifications.single?.payload.title, "Travel welcome")
     }
 
     func testGeofenceEngineIgnoresPausedCampaigns() {

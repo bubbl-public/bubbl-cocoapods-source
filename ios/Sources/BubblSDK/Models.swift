@@ -143,6 +143,83 @@ public struct BubblGeofenceTransition: Sendable, Codable, Equatable {
     }
 }
 
+public struct BubblGeofenceVertex: Sendable, Codable, Equatable {
+    public let latitude: Double
+    public let longitude: Double
+
+    public init(latitude: Double, longitude: Double) {
+        self.latitude = latitude
+        self.longitude = longitude
+    }
+}
+
+public struct BubblGeofencePolygon: Sendable, Codable, Equatable {
+    public let campaignId: String?
+    public let campaignName: String?
+    public let locationId: String?
+    public let vertices: [BubblGeofenceVertex]
+
+    public init(
+        campaignId: String? = nil,
+        campaignName: String? = nil,
+        locationId: String? = nil,
+        vertices: [BubblGeofenceVertex]
+    ) {
+        self.campaignId = campaignId
+        self.campaignName = campaignName
+        self.locationId = locationId
+        self.vertices = vertices
+    }
+}
+
+public struct BubblGeofenceCircle: Sendable, Codable, Equatable {
+    public let campaignId: String?
+    public let campaignName: String?
+    public let locationId: String?
+    public let center: BubblGeofenceVertex
+    public let radiusMeters: Double
+
+    public init(
+        campaignId: String? = nil,
+        campaignName: String? = nil,
+        locationId: String? = nil,
+        center: BubblGeofenceVertex,
+        radiusMeters: Double
+    ) {
+        self.campaignId = campaignId
+        self.campaignName = campaignName
+        self.locationId = locationId
+        self.center = center
+        self.radiusMeters = radiusMeters
+    }
+}
+
+public struct BubblGeofenceSnapshotStats: Sendable, Codable, Equatable {
+    public let campaignsTotal: Int
+    public let polygonsTotal: Int
+
+    public init(campaignsTotal: Int, polygonsTotal: Int) {
+        self.campaignsTotal = campaignsTotal
+        self.polygonsTotal = polygonsTotal
+    }
+}
+
+public struct BubblGeofenceSnapshot: Sendable, Codable, Equatable {
+    public let stats: BubblGeofenceSnapshotStats
+    public let polygons: [BubblGeofencePolygon]
+    public let circles: [BubblGeofenceCircle]
+
+    public init(
+        stats: BubblGeofenceSnapshotStats,
+        polygons: [BubblGeofencePolygon],
+        circles: [BubblGeofenceCircle] = []
+    ) {
+        self.stats = stats
+        self.polygons = polygons
+        self.circles = circles
+    }
+}
+
 public struct BubblConfiguration: Sendable, Codable, Equatable {
     public let notificationsCount: Int
     public let daysCount: Int
@@ -323,14 +400,14 @@ public struct BubblFlushResult: Sendable, Codable, Equatable {
 }
 
 public struct BubblDiagnostics: Sendable, Codable, Equatable {
-    public var sdkVersion = "3.0.4"
+    public var sdkVersion = "3.0.6"
     public var platform = "ios"
     public var booted = false
     public var pendingIngestCount = 0
     public var pushTokenSuffix: String?
 
     public init(
-        sdkVersion: String = "3.0.4",
+        sdkVersion: String = "3.0.6",
         platform: String = "ios",
         booted: Bool = false,
         pendingIngestCount: Int = 0,
@@ -354,6 +431,7 @@ public enum BubblEvent: Sendable, Equatable {
     case notificationMediaViewed(BubblNotificationPayload)
     case notificationSurveyRequested(BubblNotificationPayload)
     case locationUpdated(BubblLocation)
+    case geofenceSnapshot(BubblGeofenceSnapshot)
     case geofenceEntered(BubblGeofenceTransition)
     case geofenceExited(BubblGeofenceTransition)
     case error(code: String, message: String)

@@ -469,6 +469,8 @@ public final actor BubblClient {
     }
 
     private func processGeofenceRuntime(_ data: Data, location: BubblLocation) async throws {
+        streamContinuation.yield(.geofenceSnapshot(BubblGeofenceEngine.snapshot(runtimeResponse: data)))
+
         let state = try loadGeofenceState()
         let evaluation = BubblGeofenceEngine.evaluate(
             runtimeResponse: data,
