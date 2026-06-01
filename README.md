@@ -105,8 +105,8 @@ Public release to Maven Central is handled by GitHub Actions. Push a semantic
 version tag:
 
 ```bash
-git tag 3.0.4
-git push origin 3.0.4
+git tag 3.0.5
+git push origin 3.0.5
 ```
 
 ## iOS
@@ -136,8 +136,8 @@ For public CocoaPods trunk publishing, the source mirror
 GitHub Actions runs the macOS release workflow:
 
 ```bash
-git tag 3.0.4
-git push origin 3.0.4
+git tag 3.0.5
+git push origin 3.0.5
 ```
 
 The release workflow validates the tag against `package.json`, builds the
@@ -164,8 +164,8 @@ flutter pub publish --dry-run
 Public release to pub.dev is handled by GitHub Actions:
 
 ```bash
-git tag 3.0.4
-git push origin 3.0.4
+git tag 3.0.5
+git push origin 3.0.5
 ```
 
 ## React Native
@@ -186,8 +186,8 @@ npm publish --dry-run --access public
 Public release to npm is handled by GitHub Actions:
 
 ```bash
-git tag 3.0.4
-git push origin 3.0.4
+git tag 3.0.5
+git push origin 3.0.5
 ```
 
 ## Release Tags
@@ -195,8 +195,8 @@ git push origin 3.0.4
 Push a semantic version tag that exactly matches `package.json`:
 
 ```bash
-git tag 3.0.4
-git push origin 3.0.4
+git tag 3.0.5
+git push origin 3.0.5
 ```
 
 The GitHub release workflow always runs validation and package checks. Public

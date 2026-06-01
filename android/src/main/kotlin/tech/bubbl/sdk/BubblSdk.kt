@@ -249,6 +249,13 @@ object BubblSdk {
         }
 
         appContext = context.applicationContext
+        if (!hasFirebaseAppConfig(context.applicationContext)) {
+            val message = "Firebase is not configured for this app. Add google-services.json and apply the Google Services Gradle plugin so the SDK can obtain an FCM token."
+            Log.w(logTag, "REG-TOKEN-00 $message")
+            eventBus.tryEmit(BubblEvent.Error("firebase_config_missing", message))
+            return false
+        }
+
         Log.d(logTag, "REG-TOKEN-01 requesting current FCM token")
 
         val token = currentFcmToken()
@@ -816,6 +823,15 @@ object BubblSdk {
                 }
             }
         }
+
+    private fun hasFirebaseAppConfig(context: Context): Boolean {
+        val resourceId = context.resources.getIdentifier("google_app_id", "string", context.packageName)
+        if (resourceId == 0) {
+            return false
+        }
+
+        return runCatching { context.getString(resourceId).isNotBlank() }.getOrDefault(false)
+    }
 
     private suspend fun loadGeofenceState(): BubblGeofenceState =
         store.loadRuntimeCache("geofence-state")

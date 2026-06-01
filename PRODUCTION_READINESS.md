@@ -4,7 +4,7 @@ This is the release gate for moving v3 from beta candidate to a production SDK f
 
 ## Current Verdict
 
-**Beta-ready, not GA-ready yet.** Android, iOS, Flutter, and React Native now have native runtime wiring and strict local readiness can pass at `3.0.4`. The repo still needs staging/device canaries, CI proof against published artifacts, and final notification/location production polish before `3.0.4`.
+**Beta-ready, not GA-ready yet.** Android, iOS, Flutter, and React Native now have native runtime wiring and strict local readiness can pass at `3.0.5`. The repo still needs staging/device canaries, CI proof against published artifacts, and final notification/location production polish before `3.0.5`.
 
 The transport map is still correct for the current platform split:
 
@@ -17,7 +17,7 @@ The transport map is still correct for the current platform split:
 
 ### Beta Gate
 
-Satisfied for `3.0.4`:
+Satisfied for `3.0.5`:
 
 - Android and iOS native SDKs pass unit tests and local canaries.
 - Flutter calls through to native Android/iOS cores, and React Native calls through to native Android/iOS cores instead of returning scaffold responses.
@@ -28,7 +28,7 @@ Satisfied for `3.0.4`:
 
 ### RC Gate
 
-Must be true before `3.0.4-rc.1`:
+Must be true before `3.0.5-rc.1`:
 
 - Staging canary apps prove backend ingest, Transmission runtime, Firebase/APNs token flow, notification delivery/open analytics, geofence enter/exit, offline queue retry, and diagnostics.
 - Android Maven Central dry-run passes from the monorepo release workflow with signed artifacts and POM metadata.
@@ -39,7 +39,7 @@ Must be true before `3.0.4-rc.1`:
 
 ### GA Gate
 
-Must be true before `3.0.4`:
+Must be true before `3.0.5`:
 
 - At least one real Android and one real iOS host app integrate without SDK source patches.
 - No strict production readiness blockers remain.
@@ -107,4 +107,4 @@ cd react-native && npm pack --dry-run
 5. React Native beta wrapper.
 6. Canary host apps.
 7. RC publish dry-runs.
-8. `3.0.4` GA.
+8. `3.0.5` GA.

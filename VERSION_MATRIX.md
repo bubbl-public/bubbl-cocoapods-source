@@ -2,7 +2,7 @@
 
 | Release | Android | iOS | Flutter | React Native | Runtime Contract | Dashboard Ingest |
 | --- | --- | --- | --- | --- | --- | --- |
-| `3.0.4` | `3.0.4` | `3.0.4` | `3.0.4` | `3.0.4` | `sdk-runtime-legacy-v1` | `legacy-mirrored-v1` |
+| `3.0.5` | `3.0.5` | `3.0.5` | `3.0.5` | `3.0.5` | `sdk-runtime-legacy-v1` | `legacy-mirrored-v1` |
 
 ## Package Identities
 

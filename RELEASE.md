@@ -29,8 +29,8 @@ Keep `BUBBL_PUBLIC_REGISTRY_RELEASE` unset unless that exposure is intended.
 Use a version tag that exactly matches the root package version:
 
 ```bash
-git tag v3.0.4
-git push origin v3.0.4
+git tag v3.0.5
+git push origin v3.0.5
 ```
 
 Tag pushes run the full release workflow. The default publish target is `all`,
