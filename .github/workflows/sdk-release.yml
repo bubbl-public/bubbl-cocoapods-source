@@ -99,6 +99,8 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
 
+      - uses: android-actions/setup-android@v3
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ env.GRADLE_VERSION }}
@@ -123,6 +125,8 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: android-actions/setup-android@v3
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -165,6 +169,9 @@ jobs:
         with:
           channel: stable
 
+      - name: Trust Flutter SDK checkout
+        run: git config --global --add safe.directory "$FLUTTER_ROOT"
+
       - name: Analyze, test, and dry-run publish
         working-directory: flutter
         run: |
@@ -193,9 +200,17 @@ jobs:
 
       - uses: dart-lang/setup-dart@v1
 
+      - name: Trust Flutter SDK checkout
+        run: git config --global --add safe.directory "$FLUTTER_ROOT"
+
       - name: Publish to pub.dev
         working-directory: flutter
         run: |
+          PACKAGE_VERSION="$(awk '/^version:/ { print $2; exit }' pubspec.yaml)"
+          if curl -fsS "https://pub.dev/api/packages/bubbl_flutter_sdk/versions/${PACKAGE_VERSION}" >/dev/null; then
+            echo "bubbl_flutter_sdk ${PACKAGE_VERSION} is already published; skipping pub.dev publish."
+            exit 0
+          fi
           flutter pub get
           flutter pub publish --dry-run
           flutter pub publish --force
@@ -241,4 +256,10 @@ jobs:
         working-directory: react-native
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          if npm view "@bubblsdk/react-native-sdk@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "@bubblsdk/react-native-sdk ${PACKAGE_VERSION} is already published; skipping npm publish."
+            exit 0
+          fi
+          npm publish --access public
