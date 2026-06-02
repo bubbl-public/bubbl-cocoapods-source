@@ -1,0 +1,97 @@
+workflows:
+  ios_sdk_release:
+    name: iOS SDK Release (CocoaPods)
+    instance_type: mac_mini_m4
+    max_build_duration: 90
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "ios-*"
+          include: true
+        - pattern: "cm-ios-sdk-*"
+          include: true
+      cancel_previous_builds: true
+    environment:
+      xcode: latest
+      cocoapods: default
+      node: 22
+      ruby: 3.3.0
+      vars:
+        CM_CLONE_DEPTH: 100
+        BUBBL_COCOAPODS_SOURCE_URL: https://github.com/bubbl-platform/renewed-sdk.git
+        BUBBL_COCOAPODS_ALIAS_RELEASE: "false"
+    cache:
+      cache_paths:
+        - $HOME/Library/Caches/CocoaPods
+        - $HOME/.cocoapods/repos
+        - $CM_BUILD_DIR/ios/.build
+        - $CM_BUILD_DIR/ios/build
+        - $CM_BUILD_DIR/.build/ios-xcframework
+    scripts:
+      - name: Install CocoaPods tooling
+        script: |
+          set -euo pipefail
+          gem install cocoapods -v 1.16.2
+      - name: Validate iOS SDK release tag
+        script: |
+          set -euo pipefail
+
+          package_version="$(node -p "require('./package.json').version")"
+          release_tag="${CM_TAG:-}"
+
+          case "$release_tag" in
+            ios-*)
+              tag_version="${release_tag#ios-}"
+              ;;
+            cm-ios-sdk-*)
+              tag_version="${release_tag#cm-ios-sdk-}"
+              ;;
+            *)
+              echo "Expected an ios-* or cm-ios-sdk-* tag, got '$release_tag'."
+              exit 1
+              ;;
+          esac
+
+          if [[ "$tag_version" != "$package_version" ]]; then
+            echo "Release tag '$release_tag' must match package.json version '$package_version'."
+            exit 1
+          fi
+
+          npm run test:contracts
+          npm run test:wrappers
+          npm run test:rn
+          npm run readiness
+      - name: Swift tests
+        script: |
+          swift test --package-path ios --scratch-path "$CM_BUILD_DIR/ios/.build"
+      - name: Build XCFramework
+        script: |
+          BUBBL_IOS_XCFRAMEWORK_BUILD_DIR="$CM_BUILD_DIR/.build/ios-xcframework" \
+          BUBBL_IOS_XCFRAMEWORK_OUTPUT_DIR="$CM_BUILD_DIR/ios/build" \
+          scripts/build-ios-xcframework.sh
+      - name: Lint CocoaPods specs
+        script: |
+          set -euo pipefail
+
+          export BUBBL_COCOAPODS_SOURCE_TAG="${CM_TAG}"
+          scripts/cocoapods-lint.sh
+      - name: Publish CocoaPods trunk
+        script: |
+          set -euo pipefail
+
+          if [ "${BUBBL_PUBLIC_REGISTRY_RELEASE:-false}" != "true" ]; then
+            echo "Skipping CocoaPods publish: BUBBL_PUBLIC_REGISTRY_RELEASE is not true."
+            exit 0
+          fi
+
+          if [ "${BUBBL_COCOAPODS_TRUNK_RELEASE:-false}" != "true" ]; then
+            echo "Skipping CocoaPods publish: BUBBL_COCOAPODS_TRUNK_RELEASE is not true."
+            exit 0
+          fi
+
+          export BUBBL_COCOAPODS_SOURCE_TAG="${CM_TAG}"
+          scripts/cocoapods-publish.sh
+    artifacts:
+      - ios/build/Bubbl.xcframework
+      - build/cocoapods/*.podspec
