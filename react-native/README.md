@@ -18,6 +18,23 @@ import { Bubbl } from '@bubblsdk/react-native-sdk';
 await Bubbl.boot({ apiKey: '...' });
 ```
 
+Enable SDK-owned location/background processing when the host app has collected
+location permission:
+
+```ts
+await Bubbl.boot({
+  apiKey: '...',
+  enableLocationTracking: true,
+});
+
+await Bubbl.startLocationTracking();
+```
+
+The SDK owns the native background mechanics once enabled: Android uses the
+bundled foreground location service and WorkManager restore/refresh path, and
+iOS uses the bundled CoreLocation monitor. The host app still owns platform
+declarations and runtime permission UX.
+
 For apps that render their own in-app notification modal while still letting
 the native SDK trigger device notifications:
 
@@ -94,4 +111,4 @@ subscription.remove();
 
 - Android depends on `tech.bubbl.sdk:bubbl-sdk` and requires `minSdkVersion 27` or higher.
 - iOS depends on the `BubblSDK` CocoaPods/Swift package release and requires iOS 15 or higher.
-- Host apps still need the usual platform permissions for push notifications and location tracking.
+- Host apps must declare push/location permissions. Android needs coarse/fine/background location, foreground-service location, and notification permissions. iOS needs location usage descriptions and `UIBackgroundModes` entries for `location` and `remote-notification`.
