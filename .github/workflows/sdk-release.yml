@@ -29,16 +29,16 @@ env:
   GRADLE_VERSION: '8.5'
   DRY_RUN: ${{ github.event_name != 'push' }}
   BUBBL_PUBLIC_REGISTRY_RELEASE: ${{ vars.BUBBL_PUBLIC_REGISTRY_RELEASE || 'false' }}
-  BUBBL_COCOAPODS_TRUNK_RELEASE: ${{ vars.BUBBL_COCOAPODS_TRUNK_RELEASE || 'false' }}
 
 jobs:
   validate:
     name: Release gate
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     outputs:
       version: ${{ steps.version.outputs.version }}
       public_registry_release: ${{ steps.mode.outputs.public_registry_release }}
-      cocoapods_trunk_release: ${{ steps.mode.outputs.cocoapods_trunk_release }}
       publish_target: ${{ steps.mode.outputs.publish_target }}
     steps:
       - uses: actions/checkout@v4
@@ -66,7 +66,6 @@ jobs:
           PUBLISH_TARGET: ${{ inputs.publish_target || vars.BUBBL_SDK_RELEASE_TARGET || 'all' }}
         run: |
           PUBLIC_REGISTRY_RELEASE=false
-          COCOAPODS_TRUNK_RELEASE=false
 
           if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${BUBBL_PUBLIC_REGISTRY_RELEASE}" = "true" ]; then
             PUBLIC_REGISTRY_RELEASE=true
@@ -78,17 +77,10 @@ jobs:
             PUBLIC_REGISTRY_RELEASE=true
           fi
 
-          if [ "${PUBLIC_REGISTRY_RELEASE}" = "true" ] && \
-             [ "${PUBLISH_TARGET}" != "flutter" ] && \
-             [ "${BUBBL_COCOAPODS_TRUNK_RELEASE}" = "true" ]; then
-            COCOAPODS_TRUNK_RELEASE=true
-          fi
-
           echo "public_registry_release=${PUBLIC_REGISTRY_RELEASE}" >> "$GITHUB_OUTPUT"
-          echo "cocoapods_trunk_release=${COCOAPODS_TRUNK_RELEASE}" >> "$GITHUB_OUTPUT"
           echo "publish_target=${PUBLISH_TARGET}" >> "$GITHUB_OUTPUT"
           echo "Public registry release: ${PUBLIC_REGISTRY_RELEASE}"
-          echo "CocoaPods trunk release: ${COCOAPODS_TRUNK_RELEASE}"
+          echo "iOS SDK/CocoaPods release: Codemagic ios_sdk_release via cm-ios-sdk-* tag"
           echo "Publish target: ${PUBLISH_TARGET}"
 
       - run: npm run test:contracts
@@ -100,7 +92,9 @@ jobs:
   android-checks:
     name: Android checks
     needs: validate
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
 
@@ -124,7 +118,9 @@ jobs:
       - validate
       - android-checks
     if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     environment: maven-central
     steps:
       - uses: actions/checkout@v4
@@ -164,81 +160,12 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.MAVEN_CENTRAL_SIGNING_PASSWORD }}
         run: gradle -p android publishAndReleaseToMavenCentral --no-daemon
 
-  ios-build:
-    name: iOS SPM and XCFramework
-    needs: validate
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Swift tests
-        run: swift test --package-path ios --scratch-path /tmp/bubbl-renewed-sdk-ios-build
-
-      - name: Build XCFramework
-        run: scripts/build-ios-xcframework.sh
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Bubbl.xcframework-${{ needs.validate.outputs.version }}
-          path: ios/build/Bubbl.xcframework
-
-  cocoapods-lint:
-    name: CocoaPods lint
-    needs:
-      - validate
-      - ios-build
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-
-      - name: Install CocoaPods
-        run: gem install cocoapods -v 1.16.2
-
-      - name: Lint podspecs
-        run: |
-          pod lib lint ios/BubblSDK.podspec --allow-warnings --verbose
-          pod lib lint ios/Bubbl-Sdk.podspec --include-podspecs=ios/BubblSDK.podspec --allow-warnings --verbose
-
-  cocoapods-publish:
-    name: CocoaPods trunk
-    needs:
-      - validate
-      - cocoapods-lint
-    if: needs.validate.outputs.cocoapods_trunk_release == 'true'
-    runs-on: macos-15
-    environment: cocoapods-release
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.2'
-
-      - name: Install CocoaPods
-        run: gem install cocoapods -v 1.16.2
-
-      - name: Publish podspecs
-        env:
-          BUBBL_PUBLIC_REGISTRY_RELEASE: ${{ env.BUBBL_PUBLIC_REGISTRY_RELEASE }}
-          BUBBL_COCOAPODS_TRUNK_RELEASE: ${{ env.BUBBL_COCOAPODS_TRUNK_RELEASE }}
-          BUBBL_COCOAPODS_SOURCE_URL: ${{ vars.BUBBL_COCOAPODS_SOURCE_URL }}
-          BUBBL_COCOAPODS_SOURCE_TAG: ${{ needs.validate.outputs.version }}
-          BUBBL_COCOAPODS_ALIAS_RELEASE: ${{ vars.BUBBL_COCOAPODS_ALIAS_RELEASE || 'false' }}
-          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
-        run: scripts/cocoapods-publish.sh
-
   flutter-checks:
     name: Flutter checks
     needs: validate
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
 
@@ -260,7 +187,9 @@ jobs:
       - validate
       - flutter-checks
     if: needs.validate.outputs.public_registry_release == 'true' && (needs.validate.outputs.publish_target == 'all' || needs.validate.outputs.publish_target == 'flutter')
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     environment: pub.dev
     permissions:
       contents: read
@@ -284,7 +213,9 @@ jobs:
   react-native-pack:
     name: React Native pack
     needs: validate
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
 
@@ -305,7 +236,9 @@ jobs:
       - validate
       - react-native-pack
     if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     environment: npm-release
     permissions:
       contents: read

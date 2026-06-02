@@ -19,6 +19,8 @@ workflows:
       ruby: 3.3.0
       vars:
         CM_CLONE_DEPTH: 100
+        BUBBL_PUBLIC_REGISTRY_RELEASE: "true"
+        BUBBL_COCOAPODS_TRUNK_RELEASE: "true"
         BUBBL_COCOAPODS_SOURCE_URL: https://github.com/bubbl-platform/renewed-sdk.git
         BUBBL_COCOAPODS_ALIAS_RELEASE: "false"
     cache:

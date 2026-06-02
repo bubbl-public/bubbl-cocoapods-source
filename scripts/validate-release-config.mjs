@@ -72,7 +72,8 @@ check('react-native.public', rnPackage.publishConfig?.access === 'public', 'Reac
 
 const hasGitLabCi = exists('.gitlab-ci.yml');
 const hasGitHubRelease = exists('.github/workflows/sdk-release.yml');
-check('workflow.release', hasGitLabCi || hasGitHubRelease, 'Monorepo release workflow must exist.');
+const hasCodemagicRelease = exists('codemagic.yaml');
+check('workflow.release', hasGitLabCi || hasGitHubRelease || hasCodemagicRelease, 'Monorepo release workflow must exist.');
 
 if (hasGitLabCi) {
   const workflow = read('.gitlab-ci.yml');
@@ -83,24 +84,36 @@ if (hasGitLabCi) {
 
 if (hasGitHubRelease) {
   const workflow = read('.github/workflows/sdk-release.yml');
-  const cocoapodsPublish = read('scripts/cocoapods-publish.sh');
   for (const expected of ['publishAndReleaseToMavenCentral', 'flutter pub publish', 'npm publish']) {
     check(`github-workflow.${expected}`, workflow.includes(expected), `GitHub release workflow must include ${expected}.`);
   }
   check(
-    'github-workflow.cocoapods-publish-script',
-    workflow.includes('scripts/cocoapods-publish.sh') && cocoapodsPublish.includes('pod trunk push'),
-    'GitHub release workflow must run the CocoaPods publish script that performs pod trunk push.',
-  );
-  check(
-    'github-workflow.private-registry-gate',
+    'github-workflow.public-registry-gate',
     workflow.includes('BUBBL_PUBLIC_REGISTRY_RELEASE') && workflow.includes("needs.validate.outputs.public_registry_release == 'true'"),
     'Public registry publish jobs must be gated behind BUBBL_PUBLIC_REGISTRY_RELEASE.',
   );
   check(
-    'github-workflow.cocoapods-trunk-gate',
+    'github-workflow.self-hosted-codebuild',
+    workflow.includes('self-hosted') && workflow.includes('codebuild-bubbl-renewed-gh-linux-runner'),
+    'GitHub public publish jobs must run on the self-hosted CodeBuild runner.',
+  );
+}
+
+if (hasCodemagicRelease) {
+  const workflow = read('codemagic.yaml');
+  const cocoapodsPublish = read('scripts/cocoapods-publish.sh');
+  for (const expected of ['ios_sdk_release', 'cm-ios-sdk-*', 'scripts/cocoapods-lint.sh', 'scripts/cocoapods-publish.sh']) {
+    check(`codemagic-workflow.${expected}`, workflow.includes(expected), `Codemagic iOS SDK release workflow must include ${expected}.`);
+  }
+  check(
+    'codemagic-workflow.cocoapods-publish-script',
+    workflow.includes('scripts/cocoapods-publish.sh') && cocoapodsPublish.includes('pod trunk push'),
+    'Codemagic iOS SDK release workflow must run the CocoaPods publish script that performs pod trunk push.',
+  );
+  check(
+    'codemagic-workflow.cocoapods-trunk-gate',
     workflow.includes('BUBBL_COCOAPODS_TRUNK_RELEASE') && workflow.includes('BUBBL_COCOAPODS_SOURCE_URL'),
-    'CocoaPods trunk publish must be separately gated and use an explicit public source URL.',
+    'Codemagic CocoaPods trunk publish must be separately gated and use an explicit public source URL.',
   );
 }
 
