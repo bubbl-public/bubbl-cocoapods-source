@@ -34,7 +34,6 @@ jobs:
   validate:
     name: Release gate
     runs-on:
-      - self-hosted
       - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -93,7 +92,6 @@ jobs:
     name: Android checks
     needs: validate
     runs-on:
-      - self-hosted
       - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
@@ -119,7 +117,6 @@ jobs:
       - android-checks
     if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
     runs-on:
-      - self-hosted
       - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     environment: maven-central
     steps:
@@ -164,7 +161,6 @@ jobs:
     name: Flutter checks
     needs: validate
     runs-on:
-      - self-hosted
       - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
@@ -188,7 +184,6 @@ jobs:
       - flutter-checks
     if: needs.validate.outputs.public_registry_release == 'true' && (needs.validate.outputs.publish_target == 'all' || needs.validate.outputs.publish_target == 'flutter')
     runs-on:
-      - self-hosted
       - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     environment: pub.dev
     permissions:
@@ -214,7 +209,6 @@ jobs:
     name: React Native pack
     needs: validate
     runs-on:
-      - self-hosted
       - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
@@ -237,7 +231,6 @@ jobs:
       - react-native-pack
     if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
     runs-on:
-      - self-hosted
       - codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     environment: npm-release
     permissions:

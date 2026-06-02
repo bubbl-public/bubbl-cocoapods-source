@@ -93,9 +93,9 @@ if (hasGitHubRelease) {
     'Public registry publish jobs must be gated behind BUBBL_PUBLIC_REGISTRY_RELEASE.',
   );
   check(
-    'github-workflow.self-hosted-codebuild',
-    workflow.includes('self-hosted') && workflow.includes('codebuild-bubbl-renewed-gh-linux-runner'),
-    'GitHub public publish jobs must run on the self-hosted CodeBuild runner.',
+    'github-workflow.codebuild-runner',
+    workflow.includes('codebuild-bubbl-renewed-gh-linux-runner'),
+    'GitHub public publish jobs must run on the self-hosted CodeBuild runner label.',
   );
 }
 
