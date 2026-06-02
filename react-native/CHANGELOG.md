@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.7
+
+- Restyles the native SDK default notification modal on Android and iOS with a light card layout, clearer actions, and polished survey controls.
+- Adds regression coverage so survey options/choices continue to survive notification payload parsing.
+- Aligns the React Native wrapper with the native SDK 3.0.7 release.
+
 ## 3.0.6
 
 - Bridges iOS `geofenceSnapshot` events through the React Native wrapper so iOS map/campaign UIs receive the same active geofence snapshot as Android.

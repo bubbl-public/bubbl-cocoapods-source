@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name = 'BubblSDK'
-  s.version = '3.0.6'
+  s.version = '3.0.7'
   s.summary = 'Native iOS SDK for Bubbl v3 runtime, geofence, notification, and ingest flows.'
   s.homepage = 'https://bubbl.tech'
   s.license = { :type => 'Commercial', :text => 'Copyright Bubbl. All rights reserved.' }

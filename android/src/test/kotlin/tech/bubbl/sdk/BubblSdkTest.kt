@@ -50,7 +50,7 @@ class BubblSdkTest {
         assertEquals("/api/device-data", URI(requests.single().url).path)
         assertEquals("POST", requests.single().method)
         assertEquals("sdk-key", requests.single().headers["ApiKey"])
-        assertEquals("3.0.6", requests.single().headers["X-Bubbl-SDK-Version"])
+        assertEquals("3.0.7", requests.single().headers["X-Bubbl-SDK-Version"])
         assertEquals("android", requests.single().headers["X-Bubbl-SDK-Platform"])
         assertNotNull(requests.single().headers["Idempotency-Key"])
         assertNotNull(requests.single().headers["X-Bubbl-Install-ID"])
@@ -212,6 +212,24 @@ class BubblSdkTest {
         assertEquals("https://cdn.test/offer.png", payload?.media?.url)
         assertEquals("Open", payload?.cta?.label)
         assertEquals("1", payload?.survey?.questions?.single()?.id)
+        assertEquals("5", payload?.survey?.questions?.single()?.choices?.single()?.id)
+        assertEquals("Great", payload?.survey?.questions?.single()?.choices?.single()?.label)
+    }
+
+    @Test
+    fun parsesFirebaseSurveyOptionsAliasAsSelectableChoices() {
+        val payload = BubblNotificationPayloadParser.fromFirebasePayload(
+            payload = mapOf(
+                "title" to "Survey",
+                "body" to "Pick one",
+                "questions" to """[{"id":"1","title":"How was it?","type":"single_choice","options":[{"id":"5","label":"Great"}]}]"""
+            )
+        )
+
+        val choice = payload?.survey?.questions?.single()?.choices?.single()
+        assertNotNull(choice)
+        assertEquals("5", choice?.id)
+        assertEquals("Great", choice?.label)
     }
 
     @Test

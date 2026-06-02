@@ -11,10 +11,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.graphics.drawable.GradientDrawable
 import android.graphics.Typeface
 import android.view.Gravity
 import android.view.View
@@ -152,59 +154,93 @@ public class BubblNotificationActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
-            setPadding(0, dp(8), 0, dp(8))
+            setPadding(dp(20), dp(24), dp(20), dp(24))
+            setBackgroundColor(Color.rgb(244, 247, 251))
         }
 
-        val header = LinearLayout(this).apply {
-            gravity = Gravity.END or Gravity.CENTER_VERTICAL
-            minimumHeight = dp(52)
+        val scrollView = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams.MATCH_PARENT
             )
-            setPadding(dp(16), 0, dp(16), 0)
         }
 
-        header.addView(Button(this).apply {
-            text = "Close"
-            minHeight = dp(44)
-            minWidth = dp(72)
-            setOnClickListener { finish() }
-        })
-
-        root.addView(header)
-
-        val container = LinearLayout(this).apply {
+        val scrollContent = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(24), dp(16), dp(24), dp(32))
+            gravity = Gravity.CENTER
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
+            setPadding(0, dp(8), 0, dp(8))
         }
 
-        container.addView(TextView(this).apply {
-            text = payload.title
-            textSize = 24f
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = roundedBackground(Color.WHITE, dp(24), Color.rgb(224, 231, 241), dp(1))
+            elevation = dp(10).toFloat()
+            setPadding(dp(24), dp(24), dp(24), dp(22))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                width = minOf(resources.displayMetrics.widthPixels - dp(40), dp(520))
+            }
+        }
+
+        card.addView(TextView(this).apply {
+            text = "!"
+            textSize = 26f
+            gravity = Gravity.CENTER
             typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.rgb(7, 17, 31))
+            background = roundedBackground(Color.rgb(41, 196, 186), dp(26))
+            layoutParams = LinearLayout.LayoutParams(dp(52), dp(52)).apply {
+                bottomMargin = dp(16)
+            }
+        }
+        )
+
+        card.addView(TextView(this).apply {
+            text = payload.title
+            textSize = 23f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setTextColor(Color.rgb(7, 17, 31))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         })
 
         if (payload.body.isNotBlank()) {
-            container.addView(TextView(this).apply {
+            card.addView(TextView(this).apply {
                 text = payload.body
-                textSize = 16f
-                setPadding(0, dp(12), 0, dp(16))
+                textSize = 15f
+                gravity = Gravity.CENTER
+                setLineSpacing(dp(2).toFloat(), 1f)
+                setTextColor(Color.rgb(75, 85, 103))
+                setPadding(0, dp(12), 0, 0)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
             })
         }
 
         payload.media?.let { media ->
-            container.addView(Button(this).apply {
+            card.addView(Button(this).apply {
                 text = media.altText ?: "View media"
+                styleSecondaryButton(dp(48), dp(999), dp(1))
+                layoutParams = fullWidthLayout(top = dp(18))
                 setOnClickListener {
                     scope.launch {
                         BubblSdk.handleNotificationMediaViewed(payload)
@@ -216,8 +252,10 @@ public class BubblNotificationActivity : Activity() {
         }
 
         payload.cta?.let { cta ->
-            container.addView(Button(this).apply {
+            card.addView(Button(this).apply {
                 text = cta.label
+                stylePrimaryButton(dp(52), dp(999))
+                layoutParams = fullWidthLayout(top = dp(18))
                 setOnClickListener {
                     scope.launch {
                         BubblSdk.handleNotificationCta(payload, cta.action)
@@ -233,35 +271,59 @@ public class BubblNotificationActivity : Activity() {
                 BubblSdk.handleNotificationSurveyRequested(payload)
                 BubblSdk.flush()
             }
-            container.addView(TextView(this).apply {
-                text = "Survey"
-                textSize = 20f
-                typeface = Typeface.DEFAULT_BOLD
-                setPadding(0, dp(20), 0, dp(8))
-            })
+            val surveyPanel = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                background = roundedBackground(Color.rgb(248, 250, 252), dp(18), Color.rgb(224, 231, 241), dp(1))
+                setPadding(dp(16), dp(16), dp(16), dp(16))
+                layoutParams = fullWidthLayout(top = dp(18))
+            }
 
             val answers = mutableMapOf<String, () -> BubblSurveyAnswer>()
 
             survey.questions.forEach { question ->
-                container.addView(TextView(this).apply {
+                surveyPanel.addView(TextView(this).apply {
                     text = question.title
-                    textSize = 16f
+                    textSize = 15f
                     typeface = Typeface.DEFAULT_BOLD
-                    setPadding(0, dp(12), 0, dp(6))
+                    gravity = Gravity.CENTER
+                    setTextColor(Color.rgb(7, 17, 31))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        bottomMargin = dp(10)
+                    }
                 })
 
                 if (question.choices.isNotEmpty()) {
                     val group = RadioGroup(this).apply {
                         orientation = RadioGroup.VERTICAL
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        )
                     }
                     question.choices.forEach { choice ->
                         group.addView(RadioButton(this).apply {
                             id = View.generateViewId()
                             text = choice.label
                             tag = choice.id
+                            textSize = 14f
+                            typeface = Typeface.DEFAULT_BOLD
+                            setTextColor(Color.rgb(7, 17, 31))
+                            buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(41, 196, 186))
+                            background = roundedBackground(Color.WHITE, dp(999), Color.rgb(224, 231, 241), dp(1))
+                            setPadding(dp(14), dp(10), dp(14), dp(10))
+                            layoutParams = RadioGroup.LayoutParams(
+                                RadioGroup.LayoutParams.MATCH_PARENT,
+                                RadioGroup.LayoutParams.WRAP_CONTENT
+                            ).apply {
+                                bottomMargin = dp(10)
+                            }
                         })
                     }
-                    container.addView(group)
+                    surveyPanel.addView(group)
                     answers[question.id] = {
                         val selected = group.findViewById<RadioButton>(group.checkedRadioButtonId)
                         BubblSurveyAnswer(
@@ -274,8 +336,17 @@ public class BubblNotificationActivity : Activity() {
                     val input = EditText(this).apply {
                         hint = "Your answer"
                         minLines = 2
+                        textSize = 15f
+                        setTextColor(Color.rgb(7, 17, 31))
+                        setHintTextColor(Color.rgb(119, 128, 145))
+                        background = roundedBackground(Color.WHITE, dp(14), Color.rgb(203, 213, 225), dp(1))
+                        setPadding(dp(14), dp(12), dp(14), dp(12))
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        )
                     }
-                    container.addView(input)
+                    surveyPanel.addView(input)
                     answers[question.id] = {
                         BubblSurveyAnswer(
                             questionId = question.id,
@@ -286,8 +357,10 @@ public class BubblNotificationActivity : Activity() {
                 }
             }
 
-            container.addView(Button(this).apply {
+            surveyPanel.addView(Button(this).apply {
                 text = "Submit"
+                stylePrimaryButton(dp(52), dp(999))
+                layoutParams = fullWidthLayout(top = dp(6))
                 setOnClickListener {
                     isEnabled = false
                     scope.launch {
@@ -312,19 +385,19 @@ public class BubblNotificationActivity : Activity() {
                     text = "Submitted"
                 }
             })
+
+            card.addView(surveyPanel)
         }
 
-        val scrollView = ScrollView(this).apply {
-            isFillViewport = true
-            clipToPadding = false
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
-            addView(container)
-        }
+        card.addView(Button(this).apply {
+            text = "Close"
+            styleTextButton()
+            layoutParams = fullWidthLayout(top = dp(14))
+            setOnClickListener { finish() }
+        })
 
+        scrollContent.addView(card)
+        scrollView.addView(scrollContent)
         root.addView(scrollView)
 
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
@@ -342,6 +415,53 @@ public class BubblNotificationActivity : Activity() {
         ViewCompat.requestApplyInsets(root)
 
         return root
+    }
+
+    private fun roundedBackground(
+        fillColor: Int,
+        cornerRadius: Int,
+        strokeColor: Int? = null,
+        strokeWidth: Int = 0
+    ): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(fillColor)
+            setCornerRadius(cornerRadius.toFloat())
+            strokeColor?.let { setStroke(strokeWidth, it) }
+        }
+
+    private fun fullWidthLayout(top: Int = 0): LinearLayout.LayoutParams =
+        LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = top
+        }
+
+    private fun Button.stylePrimaryButton(minButtonHeight: Int, cornerRadius: Int) {
+        minHeight = minButtonHeight
+        textSize = 15f
+        typeface = Typeface.DEFAULT_BOLD
+        isAllCaps = false
+        setTextColor(Color.rgb(7, 17, 31))
+        background = roundedBackground(Color.rgb(41, 196, 186), cornerRadius)
+    }
+
+    private fun Button.styleSecondaryButton(minButtonHeight: Int, cornerRadius: Int, strokeWidth: Int) {
+        minHeight = minButtonHeight
+        textSize = 15f
+        typeface = Typeface.DEFAULT_BOLD
+        isAllCaps = false
+        setTextColor(Color.rgb(7, 17, 31))
+        background = roundedBackground(Color.rgb(236, 242, 249), cornerRadius, Color.rgb(224, 231, 241), strokeWidth)
+    }
+
+    private fun Button.styleTextButton() {
+        textSize = 15f
+        typeface = Typeface.DEFAULT_BOLD
+        isAllCaps = false
+        setTextColor(Color.rgb(75, 85, 103))
+        background = null
     }
 
     private fun openUrl(url: String) {

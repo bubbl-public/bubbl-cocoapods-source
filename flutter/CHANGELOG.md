@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.7
+
+- Restyles the native SDK default notification modal on Android and iOS with a light card layout, clearer actions, and polished survey controls.
+- Adds regression coverage so survey options/choices continue to survive notification payload parsing.
+- Aligns the Flutter wrapper with the native SDK 3.0.7 release.
+
 ## 3.0.6
 
 - Adds Flutter geofence snapshot event models and native bridge handling so host apps can render active campaign polygons consistently across Android and iOS.

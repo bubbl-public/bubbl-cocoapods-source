@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.0.6")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.0.7")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -259,6 +259,22 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(payload.media?.url.absoluteString, "https://cdn.test/offer.png")
         XCTAssertEqual(payload.cta?.label, "Open")
         XCTAssertEqual(payload.survey?.questions.single?.id, "1")
+        XCTAssertEqual(payload.survey?.questions.single?.choices.single?.id, "5")
+        XCTAssertEqual(payload.survey?.questions.single?.choices.single?.label, "Great")
+    }
+
+    func testParsesRemoteSurveyOptionsAliasAsSelectableChoices() throws {
+        let payload = try XCTUnwrap(
+            BubblNotificationPayloadParser.fromRemoteNotification([
+                "title": "Survey",
+                "body": "Pick one",
+                "questions": #"[{"id":"1","title":"How was it?","type":"single_choice","options":[{"id":"5","label":"Great"}]}]"#
+            ])
+        )
+
+        let choice = try XCTUnwrap(payload.survey?.questions.single?.choices.single)
+        XCTAssertEqual(choice.id, "5")
+        XCTAssertEqual(choice.label, "Great")
     }
 
     func testParsesLegacyNotificationIdAliasAsCuratedNotificationId() throws {

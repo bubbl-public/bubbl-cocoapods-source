@@ -304,12 +304,14 @@ public final class BubblNotificationViewController: UIViewController {
     private let sdk: BubblClient
     private var selectedChoices: [String: String] = [:]
     private var textAnswers: [String: UITextField] = [:]
+    private var choiceButtons: [String: [UIButton]] = [:]
 
     public init(payload: BubblNotificationPayload, sdk: BubblClient = .shared) {
         self.payload = payload
         self.sdk = sdk
         super.init(nibName: nil, bundle: nil)
-        modalPresentationStyle = .pageSheet
+        modalPresentationStyle = .overFullScreen
+        modalTransitionStyle = .crossDissolve
     }
 
     @available(*, unavailable)
@@ -319,77 +321,89 @@ public final class BubblNotificationViewController: UIViewController {
 
     public override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
-
-        let closeButton = UIButton(type: .system)
-        closeButton.setTitle("Close", for: .normal)
-        closeButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
-        closeButton.accessibilityLabel = "Close notification"
-        closeButton.contentEdgeInsets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
-        closeButton.translatesAutoresizingMaskIntoConstraints = false
-        closeButton.addAction(UIAction { [weak self] _ in
-            self?.dismiss(animated: true)
-        }, for: .touchUpInside)
-        view.addSubview(closeButton)
+        view.backgroundColor = UIColor(white: 0, alpha: 0.32)
 
         let scrollView = UIScrollView()
         scrollView.alwaysBounceVertical = true
-        scrollView.contentInsetAdjustmentBehavior = .never
+        scrollView.contentInsetAdjustmentBehavior = .always
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
 
-        let contentStack = UIStackView()
-        contentStack.axis = .vertical
-        contentStack.translatesAutoresizingMaskIntoConstraints = false
-        contentStack.isLayoutMarginsRelativeArrangement = true
-        contentStack.directionalLayoutMargins = NSDirectionalEdgeInsets(
-            top: 24,
-            leading: 24,
-            bottom: 32,
-            trailing: 24
-        )
-        scrollView.addSubview(contentStack)
+        let contentView = UIView()
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(contentView)
 
-        let topSpacer = UIView()
-        let bottomSpacer = UIView()
-        topSpacer.setContentHuggingPriority(.defaultLow, for: .vertical)
-        bottomSpacer.setContentHuggingPriority(.defaultLow, for: .vertical)
-        topSpacer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-        bottomSpacer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+        let card = UIView()
+        card.backgroundColor = .white
+        card.layer.cornerRadius = 24
+        card.layer.borderColor = UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1).cgColor
+        card.layer.borderWidth = 1
+        card.layer.shadowColor = UIColor.black.cgColor
+        card.layer.shadowOpacity = 0.16
+        card.layer.shadowRadius = 26
+        card.layer.shadowOffset = CGSize(width: 0, height: 16)
+        card.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(card)
 
         let stack = UIStackView()
         stack.axis = .vertical
+        stack.alignment = .fill
         stack.spacing = 14
+        stack.isLayoutMarginsRelativeArrangement = true
+        stack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 24, leading: 24, bottom: 22, trailing: 24)
         stack.setContentHuggingPriority(.required, for: .vertical)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        card.addSubview(stack)
 
-        contentStack.addArrangedSubview(topSpacer)
-        contentStack.addArrangedSubview(stack)
-        contentStack.addArrangedSubview(bottomSpacer)
+        let iconContainer = UIView()
+        iconContainer.translatesAutoresizingMaskIntoConstraints = false
+        let icon = UILabel()
+        icon.text = "!"
+        icon.textAlignment = .center
+        icon.textColor = UIColor(red: 0.03, green: 0.07, blue: 0.12, alpha: 1)
+        icon.font = .systemFont(ofSize: 27, weight: .black)
+        icon.backgroundColor = Self.teal
+        icon.layer.cornerRadius = 26
+        icon.clipsToBounds = true
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        iconContainer.addSubview(icon)
+        stack.addArrangedSubview(iconContainer)
 
         NSLayoutConstraint.activate([
-            closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            closeButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
-            closeButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
-            scrollView.topAnchor.constraint(equalTo: closeButton.bottomAnchor, constant: 8),
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            contentStack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
-            contentStack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
-            contentStack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
-            contentStack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
-            contentStack.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
-            contentStack.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.heightAnchor),
-            topSpacer.heightAnchor.constraint(equalTo: bottomSpacer.heightAnchor)
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+            contentView.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.heightAnchor),
+            card.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            card.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            card.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 20),
+            card.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -20),
+            card.widthAnchor.constraint(lessThanOrEqualToConstant: 520),
+            stack.topAnchor.constraint(equalTo: card.topAnchor),
+            stack.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+            stack.bottomAnchor.constraint(equalTo: card.bottomAnchor),
+            iconContainer.heightAnchor.constraint(equalToConstant: 52),
+            icon.centerXAnchor.constraint(equalTo: iconContainer.centerXAnchor),
+            icon.topAnchor.constraint(equalTo: iconContainer.topAnchor),
+            icon.bottomAnchor.constraint(equalTo: iconContainer.bottomAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 52),
+            icon.heightAnchor.constraint(equalToConstant: 52)
         ])
 
-        stack.addArrangedSubview(label(payload.title, font: .preferredFont(forTextStyle: .title2), weight: .bold))
+        stack.addArrangedSubview(label(payload.title, font: .preferredFont(forTextStyle: .title2), weight: .black, color: Self.ink, alignment: .center))
         if !payload.body.isEmpty {
-            stack.addArrangedSubview(label(payload.body, font: .preferredFont(forTextStyle: .body), weight: .regular))
+            stack.addArrangedSubview(label(payload.body, font: .preferredFont(forTextStyle: .body), weight: .regular, color: Self.slate, alignment: .center))
         }
 
         if let media = payload.media {
-            let button = button(media.altText ?? "View media") { [weak self] in
+            let button = secondaryButton(media.altText ?? "View media") { [weak self] in
                 guard let self else { return }
                 Task {
                     try? await self.sdk.handleNotificationMediaViewed(self.payload)
@@ -401,7 +415,7 @@ public final class BubblNotificationViewController: UIViewController {
         }
 
         if let cta = payload.cta {
-            let button = button(cta.label) { [weak self] in
+            let button = primaryButton(cta.label) { [weak self] in
                 guard let self else { return }
                 Task {
                     try? await self.sdk.handleNotificationCTA(self.payload, action: cta.action)
@@ -419,35 +433,62 @@ public final class BubblNotificationViewController: UIViewController {
                 try? await self.sdk.handleNotificationSurveyRequested(self.payload)
                 _ = await self.sdk.flush()
             }
-            stack.addArrangedSubview(label("Survey", font: .preferredFont(forTextStyle: .title3), weight: .bold))
+            let surveyPanel = UIStackView()
+            surveyPanel.axis = .vertical
+            surveyPanel.spacing = 10
+            surveyPanel.alignment = .fill
+            surveyPanel.isLayoutMarginsRelativeArrangement = true
+            surveyPanel.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
+            surveyPanel.backgroundColor = Self.cloud
+            surveyPanel.layer.cornerRadius = 18
+            surveyPanel.layer.borderColor = UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1).cgColor
+            surveyPanel.layer.borderWidth = 1
+
             survey.questions.forEach { question in
-                stack.addArrangedSubview(label(question.title, font: .preferredFont(forTextStyle: .headline), weight: .semibold))
+                surveyPanel.addArrangedSubview(label(question.title, font: .preferredFont(forTextStyle: .headline), weight: .bold, color: Self.ink, alignment: .center))
 
                 if question.choices.isEmpty {
                     let input = UITextField()
-                    input.borderStyle = .roundedRect
                     input.placeholder = "Your answer"
+                    input.backgroundColor = .white
+                    input.textColor = Self.ink
+                    input.layer.cornerRadius = 14
+                    input.layer.borderColor = UIColor(red: 0.80, green: 0.84, blue: 0.90, alpha: 1).cgColor
+                    input.layer.borderWidth = 1
+                    input.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 1))
+                    input.leftViewMode = .always
+                    input.heightAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
                     textAnswers[question.id] = input
-                    stack.addArrangedSubview(input)
+                    surveyPanel.addArrangedSubview(input)
                 } else {
                     let choiceStack = UIStackView()
                     choiceStack.axis = .vertical
-                    choiceStack.spacing = 8
+                    choiceStack.spacing = 10
+                    choiceButtons[question.id] = []
                     question.choices.forEach { choice in
-                        let choiceButton = button(choice.label) { [weak self] in
-                            self?.selectedChoices[question.id] = choice.id
-                        }
+                        let choiceButton = makeChoiceButton(choice.label)
+                        choiceButton.addAction(UIAction { [weak self, weak choiceButton] _ in
+                            self?.selectChoice(questionId: question.id, choiceId: choice.id, tappedButton: choiceButton)
+                        }, for: .touchUpInside)
                         choiceButton.contentHorizontalAlignment = .leading
+                        choiceButtons[question.id]?.append(choiceButton)
                         choiceStack.addArrangedSubview(choiceButton)
                     }
-                    stack.addArrangedSubview(choiceStack)
+                    surveyPanel.addArrangedSubview(choiceStack)
                 }
             }
 
-            stack.addArrangedSubview(button("Submit") { [weak self] in
+            let submit = primaryButton("Submit") { [weak self] in
                 self?.submitSurvey()
-            })
+            }
+            surveyPanel.addArrangedSubview(submit)
+            stack.addArrangedSubview(surveyPanel)
         }
+
+        let closeButton = textButton("Close") { [weak self] in
+            self?.dismiss(animated: true)
+        }
+        stack.addArrangedSubview(closeButton)
     }
 
     private func submitSurvey() {
@@ -479,27 +520,85 @@ public final class BubblNotificationViewController: UIViewController {
         }
     }
 
-    private func label(_ text: String, font: UIFont, weight: UIFont.Weight) -> UILabel {
+    private func selectChoice(questionId: String, choiceId: String, tappedButton: UIButton?) {
+        selectedChoices[questionId] = choiceId
+        choiceButtons[questionId]?.forEach { button in
+            applyChoiceStyle(button, selected: button === tappedButton)
+        }
+    }
+
+    private func label(_ text: String, font: UIFont, weight: UIFont.Weight, color: UIColor, alignment: NSTextAlignment) -> UILabel {
         let label = UILabel()
         label.text = text
         label.numberOfLines = 0
         label.font = .systemFont(ofSize: font.pointSize, weight: weight)
+        label.textColor = color
+        label.textAlignment = alignment
         label.adjustsFontForContentSizeCategory = true
         label.lineBreakMode = .byWordWrapping
+        label.setContentCompressionResistancePriority(.required, for: .vertical)
         return label
     }
 
-    private func button(_ title: String, action: @escaping () -> Void) -> UIButton {
+    private func primaryButton(_ title: String, action: @escaping () -> Void) -> UIButton {
         let button = UIButton(type: .system)
         button.setTitle(title, for: .normal)
         button.titleLabel?.font = .preferredFont(forTextStyle: .headline)
         button.titleLabel?.numberOfLines = 0
         button.titleLabel?.lineBreakMode = .byWordWrapping
-        button.contentEdgeInsets = UIEdgeInsets(top: 12, left: 14, bottom: 12, right: 14)
+        button.setTitleColor(Self.ink, for: .normal)
+        button.backgroundColor = Self.teal
+        button.layer.cornerRadius = 26
+        button.contentEdgeInsets = UIEdgeInsets(top: 14, left: 18, bottom: 14, right: 18)
+        button.heightAnchor.constraint(greaterThanOrEqualToConstant: 52).isActive = true
+        button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+        return button
+    }
+
+    private func secondaryButton(_ title: String, action: @escaping () -> Void) -> UIButton {
+        let button = primaryButton(title, action: action)
+        button.backgroundColor = UIColor(red: 0.93, green: 0.95, blue: 0.98, alpha: 1)
+        button.layer.borderColor = UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1).cgColor
+        button.layer.borderWidth = 1
+        return button
+    }
+
+    private func makeChoiceButton(_ title: String) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setTitle(title, for: .normal)
+        button.titleLabel?.font = .preferredFont(forTextStyle: .subheadline)
+        button.titleLabel?.numberOfLines = 0
+        button.titleLabel?.lineBreakMode = .byWordWrapping
+        button.contentHorizontalAlignment = .center
+        button.contentEdgeInsets = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
+        button.heightAnchor.constraint(greaterThanOrEqualToConstant: 46).isActive = true
+        applyChoiceStyle(button, selected: false)
+        return button
+    }
+
+    private func textButton(_ title: String, action: @escaping () -> Void) -> UIButton {
+        let button = UIButton(type: .system)
+        button.setTitle(title, for: .normal)
+        button.titleLabel?.font = .preferredFont(forTextStyle: .headline)
+        button.setTitleColor(Self.slate, for: .normal)
+        button.contentEdgeInsets = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
         button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
         button.addAction(UIAction { _ in action() }, for: .touchUpInside)
         return button
     }
+
+    private func applyChoiceStyle(_ button: UIButton, selected: Bool) {
+        button.backgroundColor = selected ? Self.teal : .white
+        button.setTitleColor(Self.ink, for: .normal)
+        button.layer.cornerRadius = 23
+        button.layer.borderColor = (selected ? Self.teal : UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1)).cgColor
+        button.layer.borderWidth = 1
+    }
+
+    private static let ink = UIColor(red: 0.03, green: 0.07, blue: 0.12, alpha: 1)
+    private static let slate = UIColor(red: 0.29, green: 0.33, blue: 0.40, alpha: 1)
+    private static let cloud = UIColor(red: 0.97, green: 0.98, blue: 0.99, alpha: 1)
+    private static let teal = UIColor(red: 0.16, green: 0.77, blue: 0.73, alpha: 1)
 }
 #endif
 
