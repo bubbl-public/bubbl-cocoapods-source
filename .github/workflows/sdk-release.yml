@@ -285,3 +285,35 @@ jobs:
             exit 0
           fi
           npm publish --access public
+
+  notify-slack:
+    name: Slack release notification
+    needs:
+      - validate
+      - android-checks
+      - ios-codemagic-trigger
+      - android-publish
+      - flutter-checks
+      - flutter-publish
+      - react-native-pack
+      - react-native-publish
+    if: always()
+    runs-on: codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Notify Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          CI_PROVIDER: GitHub Actions
+          STATUS: ${{ contains(join(needs.*.result, ','), 'failure') && 'failure' || contains(join(needs.*.result, ','), 'cancelled') && 'failure' || 'success' }}
+          TITLE: Bubbl SDK ${{ needs.validate.outputs.version }} release
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          JOB_RESULTS: ${{ toJson(needs) }}
+        run: node scripts/notify-slack.mjs

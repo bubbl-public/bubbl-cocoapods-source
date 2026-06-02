@@ -34,10 +34,12 @@ workflows:
       - name: Install CocoaPods tooling
         script: |
           set -euo pipefail
+          source scripts/codemagic-slack-trap.sh "Install CocoaPods tooling"
           gem install cocoapods -v 1.16.2
       - name: Validate iOS SDK release tag
         script: |
           set -euo pipefail
+          source scripts/codemagic-slack-trap.sh "Validate iOS SDK release tag"
 
           package_version="$(node -p "require('./package.json').version")"
           release_tag="${CM_TAG:-}"
@@ -66,21 +68,27 @@ workflows:
           npm run readiness
       - name: Swift tests
         script: |
+          set -euo pipefail
+          source scripts/codemagic-slack-trap.sh "Swift tests"
           swift test --package-path ios --scratch-path "$CM_BUILD_DIR/ios/.build"
       - name: Build XCFramework
         script: |
+          set -euo pipefail
+          source scripts/codemagic-slack-trap.sh "Build XCFramework"
           BUBBL_IOS_XCFRAMEWORK_BUILD_DIR="$CM_BUILD_DIR/.build/ios-xcframework" \
           BUBBL_IOS_XCFRAMEWORK_OUTPUT_DIR="$CM_BUILD_DIR/ios/build" \
           scripts/build-ios-xcframework.sh
       - name: Lint CocoaPods specs
         script: |
           set -euo pipefail
+          source scripts/codemagic-slack-trap.sh "Lint CocoaPods specs"
 
           export BUBBL_COCOAPODS_SOURCE_TAG="${CM_TAG}"
           scripts/cocoapods-lint.sh
       - name: Publish CocoaPods trunk
         script: |
           set -euo pipefail
+          source scripts/codemagic-slack-trap.sh "Publish CocoaPods trunk"
 
           if [ "${BUBBL_PUBLIC_REGISTRY_RELEASE:-false}" != "true" ]; then
             echo "Skipping CocoaPods publish: BUBBL_PUBLIC_REGISTRY_RELEASE is not true."
@@ -97,3 +105,14 @@ workflows:
     artifacts:
       - ios/build/Bubbl.xcframework
       - build/cocoapods/*.podspec
+    publishing:
+      scripts:
+        - name: Notify Slack
+          script: |
+            STATUS=success \
+            CI_PROVIDER=Codemagic \
+            TITLE="Bubbl iOS SDK release" \
+            RUN_URL="https://codemagic.io/app/${CM_PROJECT_ID:-}/build/${CM_BUILD_ID:-}" \
+            REF_NAME="${CM_TAG:-${CM_BRANCH:-}}" \
+            SHA="${CM_COMMIT:-}" \
+            node scripts/notify-slack.mjs
