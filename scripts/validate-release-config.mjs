@@ -97,6 +97,11 @@ if (hasGitHubRelease) {
     workflow.includes('codebuild-renewed-sdk-gh-linux-runner'),
     'GitHub public publish jobs must run on the self-hosted CodeBuild runner label.',
   );
+  check(
+    'github-workflow.codemagic-ios-trigger',
+    workflow.includes('Codemagic iOS SDK tag') && workflow.includes('cm-ios-sdk-${VERSION}') && workflow.includes('contents: write'),
+    'GitHub release workflow must create the Codemagic iOS SDK release tag.',
+  );
 }
 
 if (hasCodemagicRelease) {

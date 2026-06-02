@@ -286,7 +286,7 @@ class BubblFlushResult {
 
 class BubblDiagnostics {
   const BubblDiagnostics({
-    this.sdkVersion = '3.0.7',
+    this.sdkVersion = '3.1.0',
     this.platform = 'flutter',
     this.booted = false,
     this.pendingIngestCount = 0,

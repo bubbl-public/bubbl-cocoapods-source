@@ -1,10 +1,10 @@
 # Changelog
 
-## 3.0.7
+## 3.1.0
 
 - Restyles the native SDK default notification modal on Android and iOS with a light card layout, clearer actions, and polished survey controls.
 - Adds regression coverage so survey options/choices continue to survive notification payload parsing.
-- Aligns the React Native wrapper with the native SDK 3.0.7 release.
+- Aligns the React Native wrapper with the native SDK 3.1.0 release.
 
 ## 3.0.6
 

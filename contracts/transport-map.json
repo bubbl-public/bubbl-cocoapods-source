@@ -1,5 +1,5 @@
 {
-  "contractVersion": "3.0.7",
+  "contractVersion": "3.1.0",
   "environments": {
     "development": {
       "platformApiBaseUrl": "https://staging.api.bubbl.tech",
