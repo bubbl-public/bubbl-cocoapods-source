@@ -33,7 +33,7 @@ env:
 jobs:
   validate:
     name: Release gate
-    runs-on: codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     outputs:
       version: ${{ steps.version.outputs.version }}
       public_registry_release: ${{ steps.mode.outputs.public_registry_release }}
@@ -90,7 +90,7 @@ jobs:
   android-checks:
     name: Android checks
     needs: validate
-    runs-on: codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
 
@@ -114,7 +114,7 @@ jobs:
       - validate
       - android-checks
     if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
-    runs-on: codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     environment: maven-central
     steps:
       - uses: actions/checkout@v4
@@ -157,7 +157,7 @@ jobs:
   flutter-checks:
     name: Flutter checks
     needs: validate
-    runs-on: codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
 
@@ -179,7 +179,7 @@ jobs:
       - validate
       - flutter-checks
     if: needs.validate.outputs.public_registry_release == 'true' && (needs.validate.outputs.publish_target == 'all' || needs.validate.outputs.publish_target == 'flutter')
-    runs-on: codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     environment: pub.dev
     permissions:
       contents: read
@@ -203,7 +203,7 @@ jobs:
   react-native-pack:
     name: React Native pack
     needs: validate
-    runs-on: codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
 
@@ -224,7 +224,7 @@ jobs:
       - validate
       - react-native-pack
     if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
-    runs-on: codebuild-bubbl-renewed-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
     environment: npm-release
     permissions:
       contents: read

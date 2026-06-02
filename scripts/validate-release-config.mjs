@@ -94,7 +94,7 @@ if (hasGitHubRelease) {
   );
   check(
     'github-workflow.codebuild-runner',
-    workflow.includes('codebuild-bubbl-renewed-gh-linux-runner'),
+    workflow.includes('codebuild-renewed-sdk-gh-linux-runner'),
     'GitHub public publish jobs must run on the self-hosted CodeBuild runner label.',
   );
 }
