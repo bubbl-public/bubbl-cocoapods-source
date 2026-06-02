@@ -99,8 +99,12 @@ if (hasGitHubRelease) {
   );
   check(
     'github-workflow.codemagic-ios-trigger',
-    workflow.includes('Codemagic iOS SDK tag') && workflow.includes('cm-ios-sdk-${VERSION}') && workflow.includes('contents: write'),
-    'GitHub release workflow must create the Codemagic iOS SDK release tag.',
+    workflow.includes('Codemagic iOS SDK build') &&
+      workflow.includes('cm-ios-sdk-${VERSION}') &&
+      workflow.includes('https://api.codemagic.io/builds') &&
+      workflow.includes('CODEMAGIC_API_KEY') &&
+      workflow.includes('contents: write'),
+    'GitHub release workflow must create the Codemagic iOS SDK release tag and trigger Codemagic via API.',
   );
 }
 

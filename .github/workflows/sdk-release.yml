@@ -111,7 +111,7 @@ jobs:
           gradle -p android publishToMavenLocal --no-daemon
 
   ios-codemagic-trigger:
-    name: Codemagic iOS SDK tag
+    name: Codemagic iOS SDK build
     needs: validate
     if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
     runs-on: codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
@@ -131,6 +131,36 @@ jobs:
           git tag -f "$tag" "$GITHUB_SHA"
           git push origin ":refs/tags/$tag" || true
           git push origin "refs/tags/$tag"
+
+      - name: Trigger Codemagic iOS SDK release
+        env:
+          CODEMAGIC_API_KEY: ${{ secrets.CODEMAGIC_API_KEY }}
+          CODEMAGIC_APP_ID: ${{ vars.CODEMAGIC_SDK_APP_ID }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CODEMAGIC_API_KEY:-}" ]; then
+            echo "Missing CODEMAGIC_API_KEY secret."
+            exit 1
+          fi
+          if [ -z "${CODEMAGIC_APP_ID:-}" ]; then
+            echo "Missing CODEMAGIC_SDK_APP_ID variable."
+            exit 1
+          fi
+
+          payload="$(node -e 'console.log(JSON.stringify({
+            appId: process.env.CODEMAGIC_APP_ID,
+            workflowId: "ios_sdk_release",
+            tag: `cm-ios-sdk-${process.env.VERSION}`,
+            labels: ["sdk", "ios", process.env.VERSION, "github-actions"]
+          }))')"
+          response="$(curl -fsS \
+            -H "Content-Type: application/json" \
+            -H "x-auth-token: ${CODEMAGIC_API_KEY}" \
+            --data "$payload" \
+            -X POST https://api.codemagic.io/builds)"
+          echo "$response"
+          node -e 'const response = JSON.parse(process.argv[1]); if (!response.buildId) { throw new Error("Codemagic did not return buildId"); }' "$response"
 
   android-publish:
     name: Android Maven Central
