@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.homepage = 'https://bubbl.tech'
   s.license = { :type => 'Commercial', :text => 'Copyright Bubbl. All rights reserved.' }
   s.author = { 'Bubbl' => 'engineering@bubbl.tech' }
-  s.source = { :git => 'https://github.com/bubbl-platform/renewed-sdk.git', :tag => s.version.to_s }
+  s.source = { :git => 'https://github.com/bubbl-public/bubbl-cocoapods-source.git', :tag => 'v3.1.3' }
 
   s.platform = :ios, '15.0'
   s.swift_version = '5.9'
