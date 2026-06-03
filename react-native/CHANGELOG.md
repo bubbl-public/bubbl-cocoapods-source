@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.3
+
+- Hardens GitHub release publishing so SDK package releases use v-prefixed public release tags.
+- Aligns the React Native wrapper with the native SDK 3.1.3 release.
+
 ## 3.1.2
 
 - Persists iOS SDK boot configuration so background notification and location wakes can restore runtime state before React Native host code has booted again.

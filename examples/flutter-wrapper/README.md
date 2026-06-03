@@ -15,7 +15,7 @@ notification handling, flush, and SDK event listening.
 
 From the repository root, publish the local Android core to Maven local first,
 because the Flutter Android plugin depends on
-`tech.bubbl.sdk:bubbl-sdk:3.1.2`:
+`tech.bubbl.sdk:bubbl-sdk:3.1.3`:
 
 ```sh
 ../sdk/bubbl-android-sdk/gradlew -p android publishToMavenLocal

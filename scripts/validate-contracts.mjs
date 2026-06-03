@@ -31,7 +31,7 @@ function assertArray(value, label) {
 const transportMap = readJson('contracts/transport-map.json');
 const openApi = fs.readFileSync(path.join(root, 'contracts/openapi.yaml'), 'utf8');
 
-assert(transportMap.contractVersion === '3.1.2', 'unexpected contract version');
+assert(transportMap.contractVersion === '3.1.3', 'unexpected contract version');
 assert(transportMap.ingest.registerDevice.path === '/api/device-registerd/create', 'Ingest service must keep the SDK device path');
 assert(transportMap.ingest.bootBatch.path === '/api/device-data', 'Ingest service must keep the SDK device-data path');
 assert(transportMap.ingest.trackGeofenceBatch.path === '/api/geofence-data', 'Ingest service must keep the SDK geofence-data path');

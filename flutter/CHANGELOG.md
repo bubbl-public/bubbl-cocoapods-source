@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.3
+
+- Hardens GitHub release publishing so Flutter pub.dev releases use v-prefixed trusted-publisher tags.
+- Aligns the Flutter wrapper with the native SDK 3.1.3 release.
+
 ## 3.1.2
 
 - Persists iOS SDK boot configuration so background notification and location wakes can restore runtime state before React Native or Flutter host code has booted again.
