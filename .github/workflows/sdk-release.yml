@@ -57,6 +57,14 @@ jobs:
             exit 1
           fi
 
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && \
+             [ "${BUBBL_PUBLIC_REGISTRY_RELEASE}" = "true" ] && \
+             [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
+            echo "Public SDK releases must use tag 'v${VERSION}'."
+            echo "pub.dev trusted publishing is configured for v-prefixed version tags."
+            exit 1
+          fi
+
       - id: mode
         shell: bash
         env:
@@ -338,6 +346,11 @@ jobs:
           set -euo pipefail
           started_at="$(date +%s)"
           PACKAGE_VERSION="$(awk '/^version:/ { print $2; exit }' pubspec.yaml)"
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [ "${GITHUB_REF_NAME}" != "v${PACKAGE_VERSION}" ]; then
+            echo "Flutter pub.dev trusted publishing requires tag 'v${PACKAGE_VERSION}'."
+            echo "Current ref is '${GITHUB_REF_NAME}' (${GITHUB_REF_TYPE})."
+            exit 1
+          fi
           if curl -fsS "https://pub.dev/api/packages/bubbl_flutter_sdk/versions/${PACKAGE_VERSION}" >/dev/null; then
             echo "bubbl_flutter_sdk ${PACKAGE_VERSION} is already published; skipping pub.dev publish."
             echo "duration=$(($(date +%s) - started_at))" >> "$GITHUB_OUTPUT"

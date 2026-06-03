@@ -52,6 +52,9 @@ if (refName && isTag) {
   const normalizedRef = tagMatch?.[1];
   check('version.git-tag-format', Boolean(tagMatch), `Release tag must be the package version or use a supported prefix: android-, ios-, flutter-, npm-, all-, or v. Tag: ${refName}.`);
   check('version.git-tag', normalizedRef === version, `Release tag must match package version, with a supported release prefix. Tag: ${refName}; version: ${version}.`);
+  if (process.env.BUBBL_PUBLIC_REGISTRY_RELEASE === 'true') {
+    check('version.public-git-tag', refName === `v${version}`, `Public registry SDK releases must use v-prefixed tags for pub.dev trusted publishing. Tag: ${refName}; expected: v${version}.`);
+  }
 }
 
 check('android.package-space', propertyValue(androidProperties, 'GROUP') === 'tech.bubbl.sdk', 'Android must keep Maven group tech.bubbl.sdk.');

@@ -38,10 +38,52 @@ if [ "$REQUIRE_PUBLIC_SOURCE" != "false" ]; then
 fi
 
 pod trunk me
-pod trunk push build/cocoapods/BubblSDK.podspec --allow-warnings --verbose
+
+is_pod_version_published() {
+  pod_name="$1"
+  pod_version="$2"
+  curl -fsSI "https://trunk.cocoapods.org/api/v1/pods/${pod_name}/specs/${pod_version}" >/dev/null 2>&1
+}
+
+push_podspec_with_retry() {
+  pod_name="$1"
+  podspec_path="$2"
+  pod_version="$3"
+
+  if is_pod_version_published "$pod_name" "$pod_version"; then
+    echo "${pod_name} ${pod_version} is already published on CocoaPods trunk; skipping."
+    return 0
+  fi
+
+  attempt=1
+  max_attempts=3
+  while [ "$attempt" -le "$max_attempts" ]; do
+    echo "Publishing ${pod_name} ${pod_version} to CocoaPods trunk (attempt ${attempt}/${max_attempts})."
+    if pod trunk push "$podspec_path" --allow-warnings --verbose; then
+      return 0
+    fi
+
+    if is_pod_version_published "$pod_name" "$pod_version"; then
+      echo "${pod_name} ${pod_version} is now visible on CocoaPods trunk after a failed response; treating as published."
+      return 0
+    fi
+
+    if [ "$attempt" -eq "$max_attempts" ]; then
+      echo "Failed to publish ${pod_name} ${pod_version} after ${max_attempts} attempts."
+      return 1
+    fi
+
+    sleep_seconds=$((attempt * 20))
+    echo "Retrying ${pod_name} ${pod_version} in ${sleep_seconds}s."
+    sleep "$sleep_seconds"
+    attempt=$((attempt + 1))
+  done
+}
+
+push_podspec_with_retry "BubblSDK" "build/cocoapods/BubblSDK.podspec" "$VERSION"
 
 if [ "${BUBBL_COCOAPODS_ALIAS_RELEASE:-false}" = "true" ]; then
-  pod trunk push build/cocoapods/Bubbl-Sdk.podspec --synchronous --allow-warnings --verbose
+  push_podspec_with_retry "Bubbl-Sdk" "build/cocoapods/Bubbl-Sdk.podspec" "$VERSION"
 else
   echo "Skipping Bubbl-Sdk alias publish. Set BUBBL_COCOAPODS_ALIAS_RELEASE=true after alias ownership is sorted."
 fi
