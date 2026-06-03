@@ -38,6 +38,8 @@ workflows:
         script: |
           set -euo pipefail
           source scripts/codemagic-slack-trap.sh "Install CocoaPods tooling"
+          mkdir -p build/release-metrics
+          date +%s > build/release-metrics/ios-sdk-started-at
           gem install cocoapods -v 1.16.2
       - name: Validate iOS SDK release tag
         script: |
@@ -69,11 +71,20 @@ workflows:
           npm run test:wrappers
           npm run test:rn
           npm run readiness
+          cat > build/release-metrics/ios-sdk-tests-passed <<'EOF'
+          - Contract tests (`npm run test:contracts`)
+          - Wrapper tests (`npm run test:wrappers`)
+          - React Native surface tests (`npm run test:rn`)
+          - Readiness check (`npm run readiness`)
+          EOF
       - name: Swift tests
         script: |
           set -euo pipefail
           source scripts/codemagic-slack-trap.sh "Swift tests"
           swift test --package-path ios --scratch-path "$CM_BUILD_DIR/ios/.build"
+          cat >> build/release-metrics/ios-sdk-tests-passed <<'EOF'
+          - Swift package tests (`swift test --package-path ios`)
+          EOF
       - name: Build XCFramework
         script: |
           set -euo pipefail
@@ -114,10 +125,17 @@ workflows:
       scripts:
         - name: Notify Slack
           script: |
+            version="$(node -p "require('./package.json').version")"
+            started_at="$(cat build/release-metrics/ios-sdk-started-at 2>/dev/null || date +%s)"
+            duration="$(($(date +%s) - started_at))"
+            tests_passed="$(cat build/release-metrics/ios-sdk-tests-passed 2>/dev/null || true)"
             STATUS=success \
             CI_PROVIDER=Codemagic \
-            TITLE="Bubbl iOS SDK release" \
+            TITLE="Bubbl iOS SDK ${version} CocoaPods release" \
             RUN_URL="https://codemagic.io/app/${CM_PROJECT_ID:-}/build/${CM_BUILD_ID:-}" \
             REF_NAME="${CM_TAG:-${CM_BRANCH:-}}" \
             SHA="${CM_COMMIT:-}" \
+            VERSION_COMPILED="$version" \
+            DURATION_SECONDS="$duration" \
+            TESTS_PASSED="$tests_passed" \
             node scripts/notify-slack.mjs

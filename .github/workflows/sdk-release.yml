@@ -204,11 +204,17 @@ jobs:
           fi
 
       - name: Publish to Maven Central
+        id: publish_android
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.MAVEN_CENTRAL_SIGNING_PASSWORD }}
-        run: gradle -p android publishAndReleaseToMavenCentral --no-daemon
+        run: |
+          set -euo pipefail
+          started_at="$(date +%s)"
+          gradle -p android publishAndReleaseToMavenCentral --no-daemon
+          echo "duration=$(($(date +%s) - started_at))" >> "$GITHUB_OUTPUT"
+          echo "version=${{ needs.validate.outputs.version }}" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack
         if: always()
@@ -220,6 +226,16 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REF_NAME: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
+          VERSION_COMPILED: ${{ steps.publish_android.outputs.version }}
+          DURATION_SECONDS: ${{ steps.publish_android.outputs.duration }}
+          TESTS_PASSED: |-
+            - Contract tests (`npm run test:contracts`)
+            - Wrapper tests (`npm run test:wrappers`)
+            - React Native surface tests (`npm run test:rn`)
+            - Release config check (`npm run release:check`)
+            - Strict readiness check (`npm run readiness:strict`)
+            - Android JVM tests (`gradle -p android testDebugUnitTest`)
+            - Android Maven local publish (`gradle -p android publishToMavenLocal`)
         run: node scripts/notify-slack.mjs
 
   flutter-checks:
@@ -268,16 +284,23 @@ jobs:
         run: git config --global --add safe.directory "$FLUTTER_ROOT"
 
       - name: Publish to pub.dev
+        id: publish_flutter
         working-directory: flutter
         run: |
+          set -euo pipefail
+          started_at="$(date +%s)"
           PACKAGE_VERSION="$(awk '/^version:/ { print $2; exit }' pubspec.yaml)"
           if curl -fsS "https://pub.dev/api/packages/bubbl_flutter_sdk/versions/${PACKAGE_VERSION}" >/dev/null; then
             echo "bubbl_flutter_sdk ${PACKAGE_VERSION} is already published; skipping pub.dev publish."
+            echo "duration=$(($(date +%s) - started_at))" >> "$GITHUB_OUTPUT"
+            echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           flutter pub get
           flutter pub publish --dry-run
           flutter pub publish --force
+          echo "duration=$(($(date +%s) - started_at))" >> "$GITHUB_OUTPUT"
+          echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack
         if: always()
@@ -289,6 +312,16 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REF_NAME: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
+          VERSION_COMPILED: ${{ steps.publish_flutter.outputs.version }}
+          DURATION_SECONDS: ${{ steps.publish_flutter.outputs.duration }}
+          TESTS_PASSED: |-
+            - Contract tests (`npm run test:contracts`)
+            - Wrapper tests (`npm run test:wrappers`)
+            - React Native surface tests (`npm run test:rn`)
+            - Release config check (`npm run release:check`)
+            - Strict readiness check (`npm run readiness:strict`)
+            - Flutter pub get/analyze/test
+            - Flutter pub publish dry-run
         run: node scripts/notify-slack.mjs
 
   react-native-pack:
@@ -329,16 +362,23 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: Publish
+        id: publish_rn
         working-directory: react-native
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          set -euo pipefail
+          started_at="$(date +%s)"
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
           if npm view "@bubblsdk/react-native-sdk@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
             echo "@bubblsdk/react-native-sdk ${PACKAGE_VERSION} is already published; skipping npm publish."
+            echo "duration=$(($(date +%s) - started_at))" >> "$GITHUB_OUTPUT"
+            echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           npm publish --access public
+          echo "duration=$(($(date +%s) - started_at))" >> "$GITHUB_OUTPUT"
+          echo "version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack
         if: always()
@@ -350,36 +390,14 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REF_NAME: ${{ github.ref_name }}
           SHA: ${{ github.sha }}
-        run: node scripts/notify-slack.mjs
-
-  notify-slack:
-    name: Slack release notification
-    needs:
-      - validate
-      - android-checks
-      - ios-codemagic-trigger
-      - android-publish
-      - flutter-checks
-      - flutter-publish
-      - react-native-pack
-      - react-native-publish
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Notify Slack
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          CI_PROVIDER: GitHub Actions
-          STATUS: ${{ contains(join(needs.*.result, ','), 'failure') && 'failure' || contains(join(needs.*.result, ','), 'cancelled') && 'failure' || 'success' }}
-          TITLE: Bubbl SDK ${{ needs.validate.outputs.version }} release
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          REF_NAME: ${{ github.ref_name }}
-          SHA: ${{ github.sha }}
-          JOB_RESULTS: ${{ toJson(needs) }}
+          VERSION_COMPILED: ${{ steps.publish_rn.outputs.version }}
+          DURATION_SECONDS: ${{ steps.publish_rn.outputs.duration }}
+          TESTS_PASSED: |-
+            - Contract tests (`npm run test:contracts`)
+            - Wrapper tests (`npm run test:wrappers`)
+            - React Native surface tests (`npm run test:rn`)
+            - Release config check (`npm run release:check`)
+            - Strict readiness check (`npm run readiness:strict`)
+            - React Native npm pack dry-run
+            - React Native npm publish dry-run
         run: node scripts/notify-slack.mjs

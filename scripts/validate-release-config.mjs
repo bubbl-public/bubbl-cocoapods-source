@@ -93,9 +93,9 @@ if (hasGitHubRelease) {
     'Public registry publish jobs must be gated behind BUBBL_PUBLIC_REGISTRY_RELEASE.',
   );
   check(
-    'github-workflow.codebuild-runner',
-    workflow.includes('codebuild-renewed-sdk-gh-linux-runner'),
-    'GitHub public publish jobs must run on the self-hosted CodeBuild runner label.',
+    'github-workflow.github-hosted-linux-runner',
+    workflow.includes('runs-on: ubuntu-latest') && !/codebuild-[\w-]+-runner/.test(workflow),
+    'GitHub public publish jobs must use GitHub-hosted Linux runners, not CodeBuild runner labels.',
   );
   check(
     'github-workflow.codemagic-ios-trigger',

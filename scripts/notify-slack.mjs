@@ -15,7 +15,19 @@ const ref = process.env.REF_NAME || process.env.CM_TAG || process.env.CM_BRANCH 
 const sha = (process.env.SHA || process.env.CM_COMMIT || '').slice(0, 12);
 const step = process.env.STEP_NAME || '';
 const summary = process.env.SUMMARY || '';
+const version = process.env.VERSION_COMPILED || process.env.APP_VERSION || process.env.SDK_VERSION || '';
+const durationSeconds = process.env.DURATION_SECONDS || '';
+const testsPassed = process.env.TESTS_PASSED || '';
 const jobResults = process.env.JOB_RESULTS ? JSON.parse(process.env.JOB_RESULTS) : null;
+
+function formatDuration(seconds) {
+  const parsed = Number(seconds);
+  if (!Number.isFinite(parsed) || parsed < 0) return '';
+  const rounded = Math.round(parsed);
+  const minutes = Math.floor(rounded / 60);
+  const remainingSeconds = rounded % 60;
+  return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`;
+}
 
 const state = status === 'success' ? 'SUCCESS' : 'FAILURE';
 const color = status === 'success' ? '#2eb67d' : '#e01e5a';
@@ -25,6 +37,9 @@ const fields = [
   ref ? `*Ref:* ${ref}` : null,
   sha ? `*SHA:* ${sha}` : null,
   step ? `*Step:* ${step}` : null,
+  version ? `*Version compiled:* ${version}` : null,
+  durationSeconds ? `*Compile time:* ${formatDuration(durationSeconds)}` : null,
+  testsPassed ? `*Passed tests:*\n${testsPassed}` : null,
 ].filter(Boolean);
 
 if (jobResults) {
