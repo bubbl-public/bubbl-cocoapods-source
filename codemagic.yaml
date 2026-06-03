@@ -19,6 +19,7 @@ workflows:
       ruby: 3.3.0
       groups:
         - sdk_notifications
+        - sdk_cocoapods
       vars:
         CM_CLONE_DEPTH: 100
         BUBBL_PUBLIC_REGISTRY_RELEASE: "true"
