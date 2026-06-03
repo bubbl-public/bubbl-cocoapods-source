@@ -78,7 +78,7 @@ jobs:
           echo "public_registry_release=${PUBLIC_REGISTRY_RELEASE}" >> "$GITHUB_OUTPUT"
           echo "publish_target=${PUBLISH_TARGET}" >> "$GITHUB_OUTPUT"
           echo "Public registry release: ${PUBLIC_REGISTRY_RELEASE}"
-          echo "iOS SDK/CocoaPods release: Codemagic ios_sdk_release via cm-ios-sdk-* tag"
+          echo "iOS SDK/CocoaPods release: GitHub Actions macOS runner"
           echo "Publish target: ${PUBLISH_TARGET}"
 
       - run: npm run test:contracts
@@ -110,57 +110,105 @@ jobs:
           gradle -p android testDebugUnitTest --no-daemon
           gradle -p android publishToMavenLocal --no-daemon
 
-  ios-codemagic-trigger:
-    name: Codemagic iOS SDK build
+  ios-checks:
+    name: iOS SDK checks
     needs: validate
-    if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
-    runs-on: ubuntu-latest
+    if: needs.validate.outputs.publish_target != 'flutter'
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
-          fetch-depth: 0
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Push Codemagic release tag
-        env:
-          VERSION: ${{ needs.validate.outputs.version }}
+      - name: Install CocoaPods tooling
         run: |
           set -euo pipefail
-          tag="cm-ios-sdk-${VERSION}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -f "$tag" "$GITHUB_SHA"
-          git push origin ":refs/tags/$tag" || true
-          git push origin "refs/tags/$tag"
+          gem install cocoapods -v 1.16.2
 
-      - name: Trigger Codemagic iOS SDK release
-        env:
-          CODEMAGIC_API_KEY: ${{ secrets.CODEMAGIC_API_KEY }}
-          CODEMAGIC_APP_ID: ${{ vars.CODEMAGIC_SDK_APP_ID }}
-          VERSION: ${{ needs.validate.outputs.version }}
+      - name: Swift tests
+        run: npm run test:ios
+
+      - name: Build XCFramework
         run: |
           set -euo pipefail
-          if [ -z "${CODEMAGIC_API_KEY:-}" ]; then
-            echo "Missing CODEMAGIC_API_KEY secret."
-            exit 1
-          fi
-          if [ -z "${CODEMAGIC_APP_ID:-}" ]; then
-            echo "Missing CODEMAGIC_SDK_APP_ID variable."
-            exit 1
-          fi
+          started_at="$(date +%s)"
+          BUBBL_IOS_XCFRAMEWORK_BUILD_DIR="$RUNNER_TEMP/ios-xcframework" \
+          BUBBL_IOS_XCFRAMEWORK_OUTPUT_DIR="$GITHUB_WORKSPACE/ios/build" \
+          scripts/build-ios-xcframework.sh
+          echo "duration=$(($(date +%s) - started_at))" >> "$GITHUB_OUTPUT"
 
-          payload="$(node -e 'console.log(JSON.stringify({
-            appId: process.env.CODEMAGIC_APP_ID,
-            workflowId: "ios_sdk_release",
-            tag: `cm-ios-sdk-${process.env.VERSION}`,
-            labels: ["sdk", "ios", process.env.VERSION, "github-actions"]
-          }))')"
-          response="$(curl -fsS \
-            -H "Content-Type: application/json" \
-            -H "x-auth-token: ${CODEMAGIC_API_KEY}" \
-            --data "$payload" \
-            -X POST https://api.codemagic.io/builds)"
-          echo "$response"
-          node -e 'const response = JSON.parse(process.argv[1]); if (!response.buildId) { throw new Error("Codemagic did not return buildId"); }' "$response"
+      - name: Lint CocoaPods specs
+        env:
+          BUBBL_COCOAPODS_SOURCE_URL: ${{ vars.BUBBL_COCOAPODS_SOURCE_URL || 'https://github.com/bubbl-public/bubbl-cocoapods-source.git' }}
+          BUBBL_COCOAPODS_SOURCE_TAG: v${{ needs.validate.outputs.version }}
+          BUBBL_COCOAPODS_ALIAS_RELEASE: ${{ vars.BUBBL_COCOAPODS_ALIAS_RELEASE || 'false' }}
+        run: scripts/cocoapods-lint.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bubbl-iOS-SDK-${{ needs.validate.outputs.version }}
+          path: |
+            ios/build/Bubbl.xcframework
+            build/cocoapods/*.podspec
+
+  ios-cocoapods-publish:
+    name: iOS CocoaPods
+    needs:
+      - validate
+      - ios-checks
+    if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
+    runs-on: macos-15
+    environment: cocoapods
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install CocoaPods tooling
+        run: gem install cocoapods -v 1.16.2
+
+      - name: Publish to CocoaPods trunk
+        id: publish_ios
+        run: |
+          set -euo pipefail
+          started_at="$(date +%s)"
+          scripts/cocoapods-publish.sh
+          echo "duration=$(($(date +%s) - started_at))" >> "$GITHUB_OUTPUT"
+          echo "version=${{ needs.validate.outputs.version }}" >> "$GITHUB_OUTPUT"
+        env:
+          BUBBL_PUBLIC_REGISTRY_RELEASE: ${{ needs.validate.outputs.public_registry_release }}
+          BUBBL_COCOAPODS_TRUNK_RELEASE: ${{ vars.BUBBL_COCOAPODS_TRUNK_RELEASE || 'false' }}
+          BUBBL_COCOAPODS_SOURCE_URL: ${{ vars.BUBBL_COCOAPODS_SOURCE_URL || 'https://github.com/bubbl-public/bubbl-cocoapods-source.git' }}
+          BUBBL_COCOAPODS_SOURCE_TAG: v${{ needs.validate.outputs.version }}
+          BUBBL_COCOAPODS_ALIAS_RELEASE: ${{ vars.BUBBL_COCOAPODS_ALIAS_RELEASE || 'false' }}
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+
+      - name: Notify Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          CI_PROVIDER: GitHub Actions
+          STATUS: ${{ job.status }}
+          TITLE: Bubbl iOS SDK ${{ needs.validate.outputs.version }} CocoaPods release
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          VERSION_COMPILED: ${{ steps.publish_ios.outputs.version }}
+          DURATION_SECONDS: ${{ steps.publish_ios.outputs.duration }}
+          TESTS_PASSED: |-
+            - Contract tests (`npm run test:contracts`)
+            - Wrapper tests (`npm run test:wrappers`)
+            - React Native surface tests (`npm run test:rn`)
+            - Release config check (`npm run release:check`)
+            - Strict readiness check (`npm run readiness:strict`)
+            - Swift package tests (`npm run test:ios`)
+            - iOS XCFramework build (`scripts/build-ios-xcframework.sh`)
+            - CocoaPods spec lint (`scripts/cocoapods-lint.sh`)
+        run: node scripts/notify-slack.mjs
 
   android-publish:
     name: Android Maven Central

@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.1.1")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.1.2")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -835,6 +835,52 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(json?["curated_notification_id"] as? Int, 99)
             return try XCTUnwrap(json?["activity"] as? String)
         }
+        XCTAssertTrue(activities.contains("notification_sent"))
+        XCTAssertTrue(activities.contains("notification_delivered"))
+    }
+
+    func testRemoteNotificationRestoresPersistedConfigForBackgroundWake() async throws {
+        let directory = temporaryDirectory()
+        let presenter = MockNotificationPresenter()
+        let transport = MockTransport { _ in
+            BubblHTTPResponse(statusCode: 200, data: #"{"success":true}"#.data(using: .utf8)!)
+        }
+        let bootedSdk = BubblClient(storageDirectory: directory, transport: transport)
+
+        _ = try await bootedSdk.boot(
+            BubblConfig(
+                apiKey: "sdk-key",
+                runtimeBaseUrl: URL(string: "https://runtime.test")!,
+                ingestBaseUrl: URL(string: "https://ingest.test")!,
+                enableDefaultNotificationModal: false
+            )
+        )
+        await bootedSdk.shutdown()
+
+        let backgroundSdk = BubblClient(
+            storageDirectory: directory,
+            transport: transport,
+            notificationPresenter: presenter
+        )
+
+        let payload = try await backgroundSdk.handleRemoteNotification([
+            "aps": ["alert": ["title": "Background title", "body": "Background body"]],
+            "curated_notification_id": "99",
+            "location_id": "12"
+        ])
+
+        XCTAssertEqual(payload?.title, "Background title")
+        XCTAssertEqual(presenter.payloads.single?.id, payload?.id)
+        let restored = try await backgroundSdk.restoreForBackground()
+        XCTAssertTrue(restored)
+
+        let activities = try transport.requests
+            .filter { $0.url.path == "/api/activities" }
+            .map { request -> String in
+                let body = try XCTUnwrap(request.body)
+                let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+                return try XCTUnwrap(json?["activity"] as? String)
+            }
         XCTAssertTrue(activities.contains("notification_sent"))
         XCTAssertTrue(activities.contains("notification_delivered"))
     }

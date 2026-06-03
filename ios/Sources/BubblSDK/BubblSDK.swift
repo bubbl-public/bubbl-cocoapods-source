@@ -36,6 +36,7 @@ public final actor BubblClient {
         storedState.correlationId = config.correlationId ?? storedState.correlationId
         storedState.segments = config.segments
         try saveState(storedState)
+        try saveConfig(config)
 
         self.config = config
         self.state = storedState
@@ -90,6 +91,7 @@ public final actor BubblClient {
     }
 
     public func handleLocationUpdate(_ location: BubblLocation) async throws {
+        try restoreRuntimeStateIfNeeded()
         try await refreshGeofence(location)
     }
 
@@ -151,9 +153,11 @@ public final actor BubblClient {
         var nextConfig = try requireConfig()
         nextConfig.enableDefaultNotificationModal = enabled
         config = nextConfig
+        try saveConfig(nextConfig)
     }
 
     public func registerPushToken(_ token: String) async throws {
+        try restoreRuntimeStateIfNeeded()
         let activeConfig = try requireConfig()
         var activeState = try requireState()
         activeState.pushToken = token
@@ -171,6 +175,7 @@ public final actor BubblClient {
     }
 
     public func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) async throws -> BubblNotificationPayload? {
+        try restoreRuntimeStateIfNeeded()
         guard let payload = BubblNotificationPayloadParser.fromRemoteNotification(userInfo, source: .apns) else {
             streamContinuation.yield(.error(code: "notification_payload_invalid", message: "Remote notification did not contain notification content."))
             return nil
@@ -181,6 +186,7 @@ public final actor BubblClient {
     }
 
     public func handleFirebasePayload(_ payload: [String: String]) async throws -> BubblNotificationPayload? {
+        try restoreRuntimeStateIfNeeded()
         guard let notification = BubblNotificationPayloadParser.fromFirebasePayload(payload) else {
             streamContinuation.yield(.error(code: "notification_payload_invalid", message: "Firebase payload did not contain notification content."))
             return nil
@@ -235,6 +241,7 @@ public final actor BubblClient {
         userInfo: [AnyHashable: Any],
         actionIdentifier: String? = nil
     ) async throws -> BubblNotificationPayload? {
+        try restoreRuntimeStateIfNeeded()
         guard let payload = BubblNotificationPayloadParser.fromRemoteNotification(userInfo, source: .apns) else {
             streamContinuation.yield(.error(code: "notification_payload_invalid", message: "Notification response did not contain Bubbl notification content."))
             return nil
@@ -407,6 +414,22 @@ public final actor BubblClient {
             pendingIngestCount: (try? store.pendingCount()) ?? 0,
             pushTokenSuffix: pushTokenSuffix(storedPushToken)
         )
+    }
+
+    @discardableResult
+    public func restoreForBackground() throws -> Bool {
+        if config != nil && state != nil {
+            return true
+        }
+
+        guard let restoredConfig = try loadConfig() else {
+            return false
+        }
+
+        config = restoredConfig
+        state = try loadState()
+        cachedConfiguration = try cachedConfigurationFromDisk()
+        return true
     }
 
     private func pushTokenSuffix(_ token: String?) -> String? {
@@ -590,6 +613,32 @@ public final actor BubblClient {
             state = nextState
         } catch {
             throw BubblError.storage(String(describing: error))
+        }
+    }
+
+    private func loadConfig() throws -> BubblConfig? {
+        do {
+            return try store.loadConfig()
+        } catch {
+            throw BubblError.storage(String(describing: error))
+        }
+    }
+
+    private func saveConfig(_ nextConfig: BubblConfig) throws {
+        do {
+            try store.saveConfig(nextConfig)
+        } catch {
+            throw BubblError.storage(String(describing: error))
+        }
+    }
+
+    private func restoreRuntimeStateIfNeeded() throws {
+        if config != nil && state != nil {
+            return
+        }
+
+        guard try restoreForBackground() else {
+            throw BubblError.notBooted
         }
     }
 

@@ -63,7 +63,7 @@ public struct URLSessionBubblHTTPTransport: BubblHTTPTransport {
 }
 
 enum BubblTransportMap {
-    static let sdkVersion = "3.1.1"
+    static let sdkVersion = "3.1.2"
     static let platform = "ios"
 
     static let runtimeAuthHeader = "x-api-key"

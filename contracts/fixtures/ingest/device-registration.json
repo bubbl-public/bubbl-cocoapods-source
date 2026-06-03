@@ -1,7 +1,7 @@
 {
   "app_name": "Host App",
   "api_key": "company-api-key",
-  "sdk_version": "3.1.1",
+  "sdk_version": "3.1.2",
   "platform": "ios",
   "os_version": "18.0",
   "device_model": "iPhone",

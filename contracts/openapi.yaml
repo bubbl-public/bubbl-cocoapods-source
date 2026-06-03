@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: Bubbl SDK v3 Contract
-  version: 3.1.1
+  version: 3.1.2
   description: >
     SDK v3 public concepts mapped to the renewed Transmission runtime paths and
     dedicated ingest service paths.

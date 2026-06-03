@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.2
+
+- Persists iOS SDK boot configuration so background notification and location wakes can restore runtime state before React Native or Flutter host code has booted again.
+- Aligns the Flutter wrapper with the native SDK 3.1.2 release.
+
 ## 3.1.1
 
 - Restyles the native SDK default notification modal on Android and iOS with a light card layout, clearer actions, and polished survey controls.

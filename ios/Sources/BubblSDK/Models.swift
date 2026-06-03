@@ -1,6 +1,6 @@
 import Foundation
 
-public struct BubblConfig: Sendable, Equatable {
+public struct BubblConfig: Sendable, Codable, Equatable {
     public var apiKey: String
     public var environment: BubblEnvironment
     public var runtimeBaseUrl: URL?
@@ -400,14 +400,14 @@ public struct BubblFlushResult: Sendable, Codable, Equatable {
 }
 
 public struct BubblDiagnostics: Sendable, Codable, Equatable {
-    public var sdkVersion = "3.1.1"
+    public var sdkVersion = "3.1.2"
     public var platform = "ios"
     public var booted = false
     public var pendingIngestCount = 0
     public var pushTokenSuffix: String?
 
     public init(
-        sdkVersion: String = "3.1.1",
+        sdkVersion: String = "3.1.2",
         platform: String = "ios",
         booted: Bool = false,
         pendingIngestCount: Int = 0,
