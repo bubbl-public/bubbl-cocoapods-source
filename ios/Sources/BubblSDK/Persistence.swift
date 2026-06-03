@@ -71,6 +71,22 @@ struct BubblPersistentStore: Sendable {
         try secureStateStore.saveState(state)
     }
 
+    func loadConfig() throws -> BubblConfig? {
+        try ensureDirectory()
+        let url = configURL
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return nil
+        }
+
+        let data = try Data(contentsOf: url)
+        return try decoder.decode(BubblConfig.self, from: data)
+    }
+
+    func saveConfig(_ config: BubblConfig) throws {
+        try ensureDirectory()
+        try encoder.encode(config).write(to: configURL, options: [.atomic])
+    }
+
     func append(_ request: BubblQueuedRequest) throws {
         try queueStore.insert(request)
     }
@@ -144,6 +160,10 @@ struct BubblPersistentStore: Sendable {
 
     private var queueURL: URL {
         directory.appendingPathComponent("ingest-queue.sqlite")
+    }
+
+    private var configURL: URL {
+        directory.appendingPathComponent("config.json")
     }
 
     private func runtimeCacheURL(_ name: String) -> URL {
