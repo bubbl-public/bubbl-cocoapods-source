@@ -17,6 +17,8 @@ workflows:
       cocoapods: default
       node: 22
       ruby: 3.3.0
+      groups:
+        - sdk_notifications
       vars:
         CM_CLONE_DEPTH: 100
         BUBBL_PUBLIC_REGISTRY_RELEASE: "true"

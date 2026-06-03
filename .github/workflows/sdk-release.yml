@@ -210,6 +210,18 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.MAVEN_CENTRAL_SIGNING_PASSWORD }}
         run: gradle -p android publishAndReleaseToMavenCentral --no-daemon
 
+      - name: Notify Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          CI_PROVIDER: GitHub Actions
+          STATUS: ${{ job.status }}
+          TITLE: Bubbl Android SDK ${{ needs.validate.outputs.version }} Maven Central release
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: node scripts/notify-slack.mjs
+
   flutter-checks:
     name: Flutter checks
     needs: validate
@@ -267,6 +279,18 @@ jobs:
           flutter pub publish --dry-run
           flutter pub publish --force
 
+      - name: Notify Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          CI_PROVIDER: GitHub Actions
+          STATUS: ${{ job.status }}
+          TITLE: Bubbl Flutter SDK ${{ needs.validate.outputs.version }} pub.dev release
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: node scripts/notify-slack.mjs
+
   react-native-pack:
     name: React Native pack
     needs: validate
@@ -315,6 +339,18 @@ jobs:
             exit 0
           fi
           npm publish --access public
+
+      - name: Notify Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          CI_PROVIDER: GitHub Actions
+          STATUS: ${{ job.status }}
+          TITLE: Bubbl React Native SDK ${{ needs.validate.outputs.version }} npm release
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: node scripts/notify-slack.mjs
 
   notify-slack:
     name: Slack release notification

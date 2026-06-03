@@ -323,7 +323,7 @@ BubblConfiguration _configurationFromMap(Map<String, Object?> map) =>
 
 BubblDiagnostics _diagnosticsFromMap(Map<String, Object?> map) =>
     BubblDiagnostics(
-      sdkVersion: map['sdkVersion']?.toString() ?? '3.1.0',
+      sdkVersion: map['sdkVersion']?.toString() ?? '3.1.1',
       platform: map['platform']?.toString() ?? 'flutter',
       booted: _bool(map['booted']),
       pendingIngestCount: _int(map['pendingIngestCount']),
