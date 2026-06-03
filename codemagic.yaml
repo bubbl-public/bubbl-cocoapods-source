@@ -24,7 +24,7 @@ workflows:
         CM_CLONE_DEPTH: 100
         BUBBL_PUBLIC_REGISTRY_RELEASE: "true"
         BUBBL_COCOAPODS_TRUNK_RELEASE: "true"
-        BUBBL_COCOAPODS_SOURCE_URL: https://github.com/bubbl-platform/renewed-sdk.git
+        BUBBL_COCOAPODS_SOURCE_URL: https://github.com/bubbl-public/bubbl-cocoapods-source.git
         BUBBL_COCOAPODS_ALIAS_RELEASE: "false"
     cache:
       cache_paths:
@@ -86,7 +86,8 @@ workflows:
           set -euo pipefail
           source scripts/codemagic-slack-trap.sh "Lint CocoaPods specs"
 
-          export BUBBL_COCOAPODS_SOURCE_TAG="${CM_TAG}"
+          package_version="$(node -p "require('./package.json').version")"
+          export BUBBL_COCOAPODS_SOURCE_TAG="v${package_version}"
           scripts/cocoapods-lint.sh
       - name: Publish CocoaPods trunk
         script: |
@@ -103,7 +104,8 @@ workflows:
             exit 0
           fi
 
-          export BUBBL_COCOAPODS_SOURCE_TAG="${CM_TAG}"
+          package_version="$(node -p "require('./package.json').version")"
+          export BUBBL_COCOAPODS_SOURCE_TAG="v${package_version}"
           scripts/cocoapods-publish.sh
     artifacts:
       - ios/build/Bubbl.xcframework
