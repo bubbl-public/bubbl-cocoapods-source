@@ -11,8 +11,7 @@ on:
 jobs:
   contracts:
     name: Contracts and readiness report
-    runs-on:
-      - codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,8 +23,7 @@ jobs:
 
   android:
     name: Android JVM tests
-    runs-on:
-      - codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,8 +50,7 @@ jobs:
 
   flutter:
     name: Flutter wrapper checks
-    runs-on:
-      - codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -66,8 +63,7 @@ jobs:
 
   react-native:
     name: React Native surface checks
-    runs-on:
-      - codebuild-renewed-sdk-gh-linux-runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
