@@ -10,7 +10,11 @@ on:
         type: choice
         options:
           - dry-run
+          - all
+          - android
+          - ios
           - flutter
+          - react-native
   push:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+*'
@@ -78,7 +82,7 @@ jobs:
           fi
 
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && \
-             [ "${PUBLISH_TARGET}" = "flutter" ] && \
+             [ "${PUBLISH_TARGET}" != "dry-run" ] && \
              [ "${BUBBL_PUBLIC_REGISTRY_RELEASE}" = "true" ]; then
             PUBLIC_REGISTRY_RELEASE=true
           fi
@@ -98,6 +102,7 @@ jobs:
   android-checks:
     name: Android checks
     needs: validate
+    if: contains(fromJSON('["all", "android", "dry-run"]'), needs.validate.outputs.publish_target)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -121,7 +126,7 @@ jobs:
   ios-checks:
     name: iOS SDK checks
     needs: validate
-    if: needs.validate.outputs.publish_target != 'flutter'
+    if: contains(fromJSON('["all", "ios", "dry-run"]'), needs.validate.outputs.publish_target)
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -166,7 +171,7 @@ jobs:
     needs:
       - validate
       - ios-checks
-    if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
+    if: needs.validate.outputs.public_registry_release == 'true' && contains(fromJSON('["all", "ios"]'), needs.validate.outputs.publish_target)
     runs-on: macos-15
     environment: cocoapods
     steps:
@@ -223,7 +228,7 @@ jobs:
     needs:
       - validate
       - android-checks
-    if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
+    if: needs.validate.outputs.public_registry_release == 'true' && contains(fromJSON('["all", "android"]'), needs.validate.outputs.publish_target)
     runs-on: ubuntu-latest
     environment: maven-central
     steps:
@@ -306,6 +311,7 @@ jobs:
   flutter-checks:
     name: Flutter checks
     needs: validate
+    if: contains(fromJSON('["all", "flutter", "dry-run"]'), needs.validate.outputs.publish_target)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -397,6 +403,7 @@ jobs:
   react-native-pack:
     name: React Native pack
     needs: validate
+    if: contains(fromJSON('["all", "react-native", "dry-run"]'), needs.validate.outputs.publish_target)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -417,7 +424,7 @@ jobs:
     needs:
       - validate
       - react-native-pack
-    if: needs.validate.outputs.public_registry_release == 'true' && needs.validate.outputs.publish_target != 'flutter'
+    if: needs.validate.outputs.public_registry_release == 'true' && contains(fromJSON('["all", "react-native"]'), needs.validate.outputs.publish_target)
     runs-on: ubuntu-latest
     environment: npm-release
     permissions:
