@@ -149,7 +149,7 @@ jobs:
 
       - name: Lint CocoaPods specs
         env:
-          BUBBL_COCOAPODS_SOURCE_URL: https://github.com/${{ github.repository }}.git
+          BUBBL_COCOAPODS_SOURCE_URL: ${{ vars.BUBBL_COCOAPODS_SOURCE_URL || 'https://github.com/bubbl-public/bubbl-cocoapods-source.git' }}
           BUBBL_COCOAPODS_SOURCE_TAG: v${{ needs.validate.outputs.version }}
           BUBBL_COCOAPODS_ALIAS_RELEASE: ${{ vars.BUBBL_COCOAPODS_ALIAS_RELEASE || 'false' }}
         run: scripts/cocoapods-lint.sh
@@ -268,9 +268,18 @@ jobs:
         run: |
           set -euo pipefail
           started_at="$(date +%s)"
+          version="${{ needs.validate.outputs.version }}"
+
+          if curl -fsS "https://repo1.maven.org/maven2/tech/bubbl/sdk/bubbl-sdk/${version}/bubbl-sdk-${version}.pom" >/dev/null; then
+            echo "tech.bubbl.sdk:bubbl-sdk:${version} is already available on Maven Central; skipping publish."
+            echo "duration=$(($(date +%s) - started_at))" >> "$GITHUB_OUTPUT"
+            echo "version=${version}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           gradle -p android publishAndReleaseToMavenCentral --no-daemon
           echo "duration=$(($(date +%s) - started_at))" >> "$GITHUB_OUTPUT"
-          echo "version=${{ needs.validate.outputs.version }}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Notify Slack
         if: always()
