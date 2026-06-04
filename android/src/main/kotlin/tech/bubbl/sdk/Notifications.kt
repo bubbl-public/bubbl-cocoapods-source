@@ -959,6 +959,7 @@ internal object BubblNotificationPayloadCodec {
 
 internal object BubblAndroidNotificationRuntime {
     private const val channelId = "bubbl_notifications"
+    private const val legacyPushChannelId = "bubbl_push"
     private const val channelName = "Bubbl notifications"
     private const val duplicateWindowMs = 60_000L
     private const val mediaDownloadTimeoutMs = 3_000
@@ -984,7 +985,9 @@ internal object BubblAndroidNotificationRuntime {
             .setContentTitle(payload.title)
             .setContentText(payload.body)
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(notificationPriority)
+            .setCategory(notificationCategory)
+            .setDefaults(notificationDefaults)
             .setContentIntent(contentIntent(context, payload, action = BubblNotificationPayloadCodec.actionDefault))
 
         if (image != null) {
@@ -1020,7 +1023,10 @@ internal object BubblAndroidNotificationRuntime {
         BubblAndroidNotificationRenderPlan(
             shouldUseBigPicture = payload.media?.let(::isImageMedia) == true,
             contentAction = BubblNotificationPayloadCodec.actionDefault,
-            ctaAction = payload.cta?.action ?: payload.cta?.let { BubblNotificationPayloadCodec.actionCta }
+            ctaAction = payload.cta?.action ?: payload.cta?.let { BubblNotificationPayloadCodec.actionCta },
+            notificationPriority = notificationPriority,
+            notificationCategory = notificationCategory,
+            notificationDefaults = notificationDefaults
         )
 
     private fun isImageMedia(media: BubblNotificationMedia): Boolean {
@@ -1046,28 +1052,37 @@ internal object BubblAndroidNotificationRuntime {
             connection.inputStream.use(BitmapFactory::decodeStream)
         }.getOrNull()
 
-    private fun ensureChannel(context: Context) {
+    internal fun ensureDeviceNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
         val manager = context.getSystemService(NotificationManager::class.java)
-        val existing = manager.getNotificationChannel(channelId)
+        ensureHighImportanceChannel(manager, channelId)
+        ensureHighImportanceChannel(manager, legacyPushChannelId)
+    }
+
+    private fun ensureHighImportanceChannel(manager: NotificationManager, id: String) {
+        val existing = manager.getNotificationChannel(id)
         if (existing != null) {
             if (existing.importance != NotificationManager.IMPORTANCE_NONE &&
                 existing.importance < NotificationManager.IMPORTANCE_HIGH
             ) {
-                manager.deleteNotificationChannel(channelId)
+                manager.deleteNotificationChannel(id)
             } else {
                 return
             }
         }
 
         manager.createNotificationChannel(
-            NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_HIGH).apply {
+            NotificationChannel(id, channelName, NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Campaign and location notifications from Bubbl."
                 enableVibration(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
         )
+    }
+
+    private fun ensureChannel(context: Context) {
+        ensureDeviceNotificationChannel(context)
     }
 
     private fun contentIntent(context: Context, payload: BubblNotificationPayload, action: String): PendingIntent {
@@ -1094,12 +1109,19 @@ internal object BubblAndroidNotificationRuntime {
 
     private fun notificationId(payload: BubblNotificationPayload): Int =
         payload.id.hashCode().absoluteValue
+
+    private const val notificationPriority = NotificationCompat.PRIORITY_HIGH
+    private const val notificationCategory = NotificationCompat.CATEGORY_MESSAGE
+    private const val notificationDefaults = NotificationCompat.DEFAULT_ALL
 }
 
 internal data class BubblAndroidNotificationRenderPlan(
     val shouldUseBigPicture: Boolean,
     val contentAction: String,
-    val ctaAction: String?
+    val ctaAction: String?,
+    val notificationPriority: Int,
+    val notificationCategory: String,
+    val notificationDefaults: Int
 )
 
 private object BubblNotificationDeduper {

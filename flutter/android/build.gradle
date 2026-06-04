@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "tech.bubbl.flutter_sdk"
-version = "3.1.3"
+version = "3.1.4"
 
 android {
     namespace = "tech.bubbl.flutter_sdk"
@@ -25,6 +25,6 @@ android {
 }
 
 dependencies {
-    implementation "tech.bubbl.sdk:bubbl-sdk:3.1.3"
+    implementation "tech.bubbl.sdk:bubbl-sdk:3.1.4"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1"
 }

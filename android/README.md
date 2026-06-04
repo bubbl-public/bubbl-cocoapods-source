@@ -26,7 +26,7 @@ The alpha runtime has real transport and Android persistence wiring behind the s
 - `startLocationTracking()` / `stopLocationTracking()` control `BubblLocationUpdatesService`, the opted-in foreground service that continuously forwards location fixes while `enableLocationTracking` is true.
 - When `enableLocationTracking` is enabled, the periodic WorkManager refresh tries the device's last known location for background-safe geofence refreshes.
 - Native device notifications are rendered by default when `enablePushHandling = true` and `notificationRenderingMode = SdkDefault`.
-- Native device notifications use a high-importance `bubbl_notifications` channel on Android O+ so eligible campaign notifications can appear as heads-up banners when system/user notification settings allow it.
+- Native device notifications use a high-importance `bubbl_notifications` channel on Android O+ so eligible campaign notifications can appear as heads-up banners when system/user notification settings allow it. The SDK creates this channel during install/boot and declares it as Firebase's default notification channel for background auto-rendered FCM notifications.
 - Notification taps route through `BubblNotificationActivity`, which provides a default detail/survey UI.
 - Firebase auto-rendered notification taps can be forwarded from the launcher activity with `BubblSdk.openNotificationIntent(activity, intent)`.
 - In-app notification inbox/history rows can open the bundled detail/survey UI with `BubblSdk.openNotificationModal(context, payload)` without posting another device notification.

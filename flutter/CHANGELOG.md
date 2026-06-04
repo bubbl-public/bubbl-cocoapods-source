@@ -1,9 +1,10 @@
 # Changelog
 
-## 3.1.3
+## 3.1.4
 
-- Hardens GitHub release publishing so Flutter pub.dev releases use v-prefixed trusted-publisher tags.
-- Aligns the Flutter wrapper with the native SDK 3.1.3 release.
+- Aligns the Flutter wrapper with the native SDK 3.1.4 release.
+- Android SDK notifications now create both the canonical `bubbl_notifications` channel and legacy `bubbl_push` channel during install/boot so background FCM auto-rendering can use a heads-up capable channel.
+- Android local campaign notifications now render with high priority, message category, and default alert behavior for more reliable device banners.
 
 ## 3.1.2
 

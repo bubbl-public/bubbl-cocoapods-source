@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import androidx.core.app.NotificationCompat
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,7 +51,7 @@ class BubblSdkTest {
         assertEquals("/api/device-data", URI(requests.single().url).path)
         assertEquals("POST", requests.single().method)
         assertEquals("sdk-key", requests.single().headers["ApiKey"])
-        assertEquals("3.1.3", requests.single().headers["X-Bubbl-SDK-Version"])
+        assertEquals("3.1.4", requests.single().headers["X-Bubbl-SDK-Version"])
         assertEquals("android", requests.single().headers["X-Bubbl-SDK-Platform"])
         assertNotNull(requests.single().headers["Idempotency-Key"])
         assertNotNull(requests.single().headers["X-Bubbl-Install-ID"])
@@ -767,6 +768,9 @@ class BubblSdkTest {
         assertEquals(true, plan.shouldUseBigPicture)
         assertEquals(BubblNotificationPayloadCodec.actionDefault, plan.contentAction)
         assertEquals("open_offer", plan.ctaAction)
+        assertEquals(NotificationCompat.PRIORITY_HIGH, plan.notificationPriority)
+        assertEquals(NotificationCompat.CATEGORY_MESSAGE, plan.notificationCategory)
+        assertEquals(NotificationCompat.DEFAULT_ALL, plan.notificationDefaults)
     }
 
     @Test

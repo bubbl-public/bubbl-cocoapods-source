@@ -51,9 +51,11 @@ object BubblSdk {
         context: Context,
         transport: BubblHttpTransport = UrlConnectionBubblHttpTransport()
     ) {
-        this.appContext = context.applicationContext
-        this.store = AndroidBubblStore(context.applicationContext)
+        val applicationContext = context.applicationContext
+        this.appContext = applicationContext
+        this.store = AndroidBubblStore(applicationContext)
         this.transport = transport
+        BubblAndroidNotificationRuntime.ensureDeviceNotificationChannel(applicationContext)
     }
 
     suspend fun boot(config: BubblConfig): BubblBootResult {
@@ -81,6 +83,7 @@ object BubblSdk {
         appContext?.let {
             BubblWorkScheduler.schedulePeriodicWork(it, config)
             if (config.enablePushHandling) {
+                BubblAndroidNotificationRuntime.ensureDeviceNotificationChannel(it)
                 syncCurrentFcmTokenAsync(it)
             }
             if (config.enableLocationTracking && BubblAndroidLocationProvider.hasLocationPermission(it)) {

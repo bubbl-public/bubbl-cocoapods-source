@@ -46,6 +46,7 @@ Implemented in this repository now:
   - `onMessageReceived` forwards Firebase data/notification payloads into the SDK.
   - `onNewToken` forwards FCM tokens through `syncFcmToken(token)` / `registerPushToken(token)`.
   - Native notification channel and `NotificationCompat` system notification rendering.
+  - The Android SDK creates the high-importance `bubbl_notifications` channel during install/boot so background FCM auto-rendered notifications can use the same heads-up capable channel before the SDK service is invoked.
   - Big-picture image notifications for image media payloads, with text fallback when media cannot be downloaded.
   - CTA notification actions route through the bundled tap activity and queue CTA analytics.
   - Notification taps route through bundled `BubblNotificationActivity`.
@@ -95,6 +96,7 @@ Still to build:
 ## Goals
 
 - Device notifications work out of the box once push/location permissions and platform setup are complete.
+- Banner acceptance tests must verify an OS-level notification banner/notification-center entry, not only a host-app tray event.
 - Firebase integration is bundled into the platform SDK/runtime so most apps do not need to write Firebase glue code.
 - Default notification and survey UI ships with the SDK and works out of the box.
 - Host apps can customize or replace default UI when needed.
