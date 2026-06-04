@@ -149,7 +149,7 @@ jobs:
 
       - name: Lint CocoaPods specs
         env:
-          BUBBL_COCOAPODS_SOURCE_URL: ${{ vars.BUBBL_COCOAPODS_SOURCE_URL || 'https://github.com/bubbl-public/bubbl-cocoapods-source.git' }}
+          BUBBL_COCOAPODS_SOURCE_URL: https://github.com/${{ github.repository }}.git
           BUBBL_COCOAPODS_SOURCE_TAG: v${{ needs.validate.outputs.version }}
           BUBBL_COCOAPODS_ALIAS_RELEASE: ${{ vars.BUBBL_COCOAPODS_ALIAS_RELEASE || 'false' }}
         run: scripts/cocoapods-lint.sh
