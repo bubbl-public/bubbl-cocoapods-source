@@ -187,7 +187,7 @@ struct CanaryRunner {
         try expect(!ingestRequests.isEmpty, "No ingest requests were captured")
         for request in ingestRequests {
             try expect(request.headers["ApiKey"] == "canary-api-key", "Ingest request was missing ApiKey")
-            try expect(request.headers["X-Bubbl-SDK-Version"] == "3.1.4", "Ingest request was missing SDK version")
+            try expect(request.headers["X-Bubbl-SDK-Version"] == "3.1.5", "Ingest request was missing SDK version")
             try expect(request.headers["X-Bubbl-SDK-Platform"] == "ios", "Ingest request was missing SDK platform")
             try expect(request.headers["X-Bubbl-Install-ID"]?.isEmpty == false, "Ingest request was missing install ID")
         }

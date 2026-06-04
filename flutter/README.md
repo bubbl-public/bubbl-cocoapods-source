@@ -8,7 +8,7 @@ The Dart facade forwards calls to the native Android and iOS SDK cores. Native r
 
 ```yaml
 dependencies:
-  bubbl_flutter_sdk: ^3.1.4
+  bubbl_flutter_sdk: ^3.1.5
 ```
 
 ## Boot

@@ -248,7 +248,9 @@ public final class BubblNotificationCenterDelegate: NSObject, UNUserNotification
             if autoFlush {
                 _ = await sdk.flush()
             }
-            completionHandler()
+            await MainActor.run {
+                completionHandler()
+            }
         }
     }
 }

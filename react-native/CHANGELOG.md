@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.5
+
+- Aligns the React Native wrapper with the native SDK 3.1.5 release.
+- iOS notification tap handling now completes the `UNUserNotificationCenterDelegate` response on the main actor to avoid UIKit state-restoration crashes when opening a notification from the tray.
+
 ## 3.1.4
 
 - Aligns the React Native wrapper with the native SDK 3.1.4 release.
