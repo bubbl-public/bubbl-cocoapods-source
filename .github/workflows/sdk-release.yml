@@ -251,14 +251,30 @@ jobs:
           MAVEN_CENTRAL_SIGNING_KEY: ${{ secrets.MAVEN_CENTRAL_SIGNING_KEY }}
           MAVEN_CENTRAL_SIGNING_KEY_B64: ${{ secrets.MAVEN_CENTRAL_SIGNING_KEY_B64 }}
         run: |
+          mask_multiline_secret() {
+            while IFS= read -r secret_line; do
+              if [ -n "${secret_line}" ]; then
+                echo "::add-mask::${secret_line}"
+              fi
+            done
+          }
+
+          write_signing_key_env() {
+            echo "ORG_GRADLE_PROJECT_signingInMemoryKey<<EOF" >> "$GITHUB_ENV"
+            cat "$1" >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
+          }
+
           if [ -n "${MAVEN_CENTRAL_SIGNING_KEY_B64}" ]; then
-            echo "ORG_GRADLE_PROJECT_signingInMemoryKey<<EOF" >> "$GITHUB_ENV"
-            echo "${MAVEN_CENTRAL_SIGNING_KEY_B64}" | base64 --decode >> "$GITHUB_ENV"
-            echo "EOF" >> "$GITHUB_ENV"
+            decoded_key="$(mktemp)"
+            echo "${MAVEN_CENTRAL_SIGNING_KEY_B64}" | base64 --decode > "$decoded_key"
+            mask_multiline_secret < "$decoded_key"
+            write_signing_key_env "$decoded_key"
           elif [ -n "${MAVEN_CENTRAL_SIGNING_KEY}" ]; then
-            echo "ORG_GRADLE_PROJECT_signingInMemoryKey<<EOF" >> "$GITHUB_ENV"
-            echo "${MAVEN_CENTRAL_SIGNING_KEY}" >> "$GITHUB_ENV"
-            echo "EOF" >> "$GITHUB_ENV"
+            decoded_key="$(mktemp)"
+            printf '%s\n' "${MAVEN_CENTRAL_SIGNING_KEY}" > "$decoded_key"
+            mask_multiline_secret < "$decoded_key"
+            write_signing_key_env "$decoded_key"
           else
             echo "Missing MAVEN_CENTRAL_SIGNING_KEY or MAVEN_CENTRAL_SIGNING_KEY_B64."
             exit 1
