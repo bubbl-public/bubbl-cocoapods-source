@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name = 'BubblReactNativeSdk'
-  s.version = '3.1.5'
+  s.version = '3.1.6'
   s.summary = 'React Native wrapper for Bubbl SDK v3 native Android and iOS cores.'
   s.homepage = 'https://bubbl.tech'
   s.license = { :type => 'Commercial', :text => 'Copyright Bubbl. All rights reserved.' }
@@ -13,5 +13,5 @@ Pod::Spec.new do |s|
   s.static_framework = true
 
   s.dependency 'React-Core'
-  s.dependency 'BubblSDK', '3.1.5'
+  s.dependency 'BubblSDK', '3.1.6'
 end

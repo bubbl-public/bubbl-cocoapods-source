@@ -51,7 +51,7 @@ class BubblSdkTest {
         assertEquals("/api/device-data", URI(requests.single().url).path)
         assertEquals("POST", requests.single().method)
         assertEquals("sdk-key", requests.single().headers["ApiKey"])
-        assertEquals("3.1.5", requests.single().headers["X-Bubbl-SDK-Version"])
+        assertEquals("3.1.6", requests.single().headers["X-Bubbl-SDK-Version"])
         assertEquals("android", requests.single().headers["X-Bubbl-SDK-Platform"])
         assertNotNull(requests.single().headers["Idempotency-Key"])
         assertNotNull(requests.single().headers["X-Bubbl-Install-ID"])
@@ -682,6 +682,53 @@ class BubblSdkTest {
     }
 
     @Test
+    fun geofenceEngineGatesSameNotificationAcrossCampaignLocations() {
+        val response = geofenceRuntimeResponseWithTwoLocationsSameNotification()
+        val firstLocation = BubblLocation(latitude = 51.50158, longitude = -0.141)
+        val secondLocation = BubblLocation(latitude = 51.50358, longitude = -0.141)
+        val outside = BubblLocation(latitude = 51.500, longitude = -0.141)
+        val now = Instant.parse("2026-05-05T10:00:00Z")
+
+        val firstEntered = BubblGeofenceEngine.evaluate(
+            runtimeResponse = response,
+            location = firstLocation,
+            state = BubblGeofenceState(),
+            now = now
+        )
+        val exited = BubblGeofenceEngine.evaluate(
+            runtimeResponse = response,
+            location = outside,
+            state = firstEntered.nextState,
+            now = now.plusSeconds(30)
+        )
+        val secondEntered = BubblGeofenceEngine.evaluate(
+            runtimeResponse = response,
+            location = secondLocation,
+            state = exited.nextState,
+            now = now.plusSeconds(60)
+        )
+
+        assertEquals("Welcome", firstEntered.notifications.single().payload.title)
+        assertEquals(BubblGeofenceTransitionType.Enter, secondEntered.transitions.single().type)
+        assertEquals(emptyList<BubblGeofenceNotificationDispatch>(), secondEntered.notifications)
+    }
+
+    @Test
+    fun geofenceEngineAllowsDistinctNotificationsInSameCampaign() {
+        val entered = BubblGeofenceEngine.evaluate(
+            runtimeResponse = geofenceRuntimeResponseWithDistinctEnterNotifications(),
+            location = BubblLocation(latitude = 51.50158, longitude = -0.141),
+            state = BubblGeofenceState(),
+            now = Instant.parse("2026-05-05T10:00:00Z")
+        )
+
+        assertEquals(
+            listOf("First welcome", "Second welcome"),
+            entered.notifications.map { it.payload.title }
+        )
+    }
+
+    @Test
     fun refreshGeofenceRoutesEnterTransitionThroughNotificationEngine() = runBlocking {
         val requests = mutableListOf<BubblHttpRequest>()
         val transport = BubblHttpTransport { request ->
@@ -1193,4 +1240,94 @@ class BubblSdkTest {
             }
         """.trimIndent()
     }
+
+    private fun geofenceRuntimeResponseWithTwoLocationsSameNotification(): String =
+        """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": 123,
+                  "campaignName": "Multi-location campaign",
+                  "type": "GEO",
+                  "active": "true",
+                  "locationsArray": [
+                    {
+                      "locationId": 10,
+                      "geofence": [
+                        { "position": 1, "latitude": "51.501476", "longitude": "-0.140112" },
+                        { "position": 2, "latitude": "51.501800", "longitude": "-0.141000" },
+                        { "position": 3, "latitude": "51.501476", "longitude": "-0.142000" }
+                      ]
+                    },
+                    {
+                      "locationId": 11,
+                      "geofence": [
+                        { "position": 1, "latitude": "51.503476", "longitude": "-0.140112" },
+                        { "position": 2, "latitude": "51.503800", "longitude": "-0.141000" },
+                        { "position": 3, "latitude": "51.503476", "longitude": "-0.142000" }
+                      ]
+                    }
+                  ],
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": 456,
+                      "headline": "Welcome",
+                      "body": "Thanks for visiting",
+                      "type": "notification",
+                      "activation": "ON_ENTER",
+                      "published": true,
+                      "coolingPeriodSeconds": 3600,
+                      "maximumTriggers": 1
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.trimIndent()
+
+    private fun geofenceRuntimeResponseWithDistinctEnterNotifications(): String =
+        """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": 123,
+                  "campaignName": "Distinct notifications",
+                  "type": "GEO",
+                  "active": "true",
+                  "locationsArray": {
+                    "locationId": 10,
+                    "geofence": [
+                      { "position": 1, "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "position": 2, "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "position": 3, "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": 456,
+                      "headline": "First welcome",
+                      "body": "First",
+                      "type": "notification",
+                      "activation": "ON_ENTER",
+                      "published": true,
+                      "maximumTriggers": 1
+                    },
+                    {
+                      "curatedNotificationId": 457,
+                      "headline": "Second welcome",
+                      "body": "Second",
+                      "type": "notification",
+                      "activation": "ON_ENTER",
+                      "published": true,
+                      "maximumTriggers": 1
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.trimIndent()
 }

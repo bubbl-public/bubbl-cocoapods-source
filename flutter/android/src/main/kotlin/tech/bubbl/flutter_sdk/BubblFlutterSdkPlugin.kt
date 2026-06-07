@@ -90,7 +90,7 @@ class BubblFlutterSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Ev
         scope.launch {
             try {
                 val value = withContext(Dispatchers.IO) { handle(call) }
-                result.success(value)
+                result.success(value.toFlutterResult())
             } catch (error: IllegalArgumentException) {
                 result.error("invalid_argument", error.message, null)
             } catch (error: Throwable) {
@@ -144,6 +144,9 @@ class BubblFlutterSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Ev
             else -> throw IllegalArgumentException("Unknown Bubbl Flutter method: ${call.method}")
         }
     }
+
+    private fun Any?.toFlutterResult(): Any? =
+        if (this == Unit) null else this
 
     @Suppress("UNCHECKED_CAST")
     private fun MethodCall.argumentsMap(): Map<String, Any?> =

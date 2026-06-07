@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
-const root = path.resolve(new URL('..', import.meta.url).pathname);
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf8'));
@@ -31,7 +32,7 @@ function assertArray(value, label) {
 const transportMap = readJson('contracts/transport-map.json');
 const openApi = fs.readFileSync(path.join(root, 'contracts/openapi.yaml'), 'utf8');
 
-assert(transportMap.contractVersion === '3.1.5', 'unexpected contract version');
+assert(transportMap.contractVersion === '3.1.6', 'unexpected contract version');
 assert(transportMap.ingest.registerDevice.path === '/api/device-registerd/create', 'Ingest service must keep the SDK device path');
 assert(transportMap.ingest.bootBatch.path === '/api/device-data', 'Ingest service must keep the SDK device-data path');
 assert(transportMap.ingest.trackGeofenceBatch.path === '/api/geofence-data', 'Ingest service must keep the SDK geofence-data path');

@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.6
+
+- Aligns the React Native wrapper with the native SDK 3.1.6 release.
+- Geofence retrigger gates now suppress the same notification across a campaign while allowing distinct notifications to fire independently.
+
 ## 3.1.5
 
 - Aligns the React Native wrapper with the native SDK 3.1.5 release.

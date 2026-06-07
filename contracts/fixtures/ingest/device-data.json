@@ -2,7 +2,7 @@
   "device_registered": {
     "app_name": "Bubbl Canary",
     "api_key": "sdk_fixture_key",
-    "sdk_version": "3.1.5",
+    "sdk_version": "3.1.6",
     "platform": "ios",
     "os_version": "17.4",
     "device_model": "iPhone 15",

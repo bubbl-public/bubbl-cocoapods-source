@@ -166,7 +166,7 @@ internal object BubblGeofenceEngine {
             transitions += transition
 
             for (candidate in campaign.notifications.filter { it.activation == transitionType }) {
-                val triggerKey = listOf(campaign.regionKey, candidate.payload.id, transitionType.name).joinToString(":")
+                val triggerKey = listOf(campaign.notificationTriggerScope, candidate.payload.id).joinToString(":")
                 val previousTrigger = triggers[triggerKey]
                 if (!candidate.canTrigger(previousTrigger, state.ctaSuspensions.contains(triggerKey), now)) continue
 
@@ -223,11 +223,13 @@ internal object BubblGeofenceEngine {
                 if (notifications.isEmpty()) continue
 
                 for (locationShape in locationShapes(campaign)) {
+                    val notificationTriggerScope = campaignId ?: "campaign-$campaignIndex"
                     add(
                         RuntimeGeofenceCampaign(
                             regionKey = listOfNotNull(campaignId, locationShape.locationId).ifEmpty {
                                 listOf("campaign-$campaignIndex", "location-${size}")
                             }.joinToString(":"),
+                            notificationTriggerScope = notificationTriggerScope,
                             campaignId = campaignId,
                             locationId = locationShape.locationId,
                             polygon = locationShape.polygon,
@@ -375,6 +377,7 @@ internal object BubblGeofenceEngine {
 
     private data class RuntimeGeofenceCampaign(
         val regionKey: String,
+        val notificationTriggerScope: String,
         val campaignId: String?,
         val locationId: String?,
         val polygon: List<GeoPoint>,

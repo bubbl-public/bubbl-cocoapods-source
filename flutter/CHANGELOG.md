@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.6
+
+- Aligns the Flutter wrapper with the native SDK 3.1.6 release.
+- Android geofence retrigger gates now suppress the same notification across a campaign while allowing distinct notifications to fire independently.
+- Android method-channel void results are normalized to avoid `kotlin.Unit` codec errors from SDK controls such as geofence refresh.
+
 ## 3.1.5
 
 - Aligns the Flutter wrapper with the native SDK 3.1.5 release.

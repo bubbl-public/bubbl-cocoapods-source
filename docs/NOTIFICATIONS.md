@@ -40,7 +40,7 @@ Implemented in this repository now:
   - Persists last location, inside/outside state, notification trigger counts, and last trigger timestamps in the existing runtime cache.
   - Emits typed location update, geofence entered, and geofence exited events.
   - Queues location/geofence activity and geofence notification batches to the renewed Ingest service paths.
-  - Suppresses repeat notifications while the device remains inside a region and enforces notification/campaign cooldown and maximum trigger values.
+  - Suppresses repeat notifications while the device remains inside a region and enforces per-notification cooldown and maximum trigger values, scoped to the campaign when campaign identity is available.
 - Android Firebase bridge:
   - Bundled `BubblFirebaseMessagingService`.
   - `onMessageReceived` forwards Firebase data/notification payloads into the SDK.

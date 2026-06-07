@@ -143,7 +143,7 @@ enum BubblGeofenceEngine {
             transitions.append(transition)
 
             for candidate in campaign.notifications where candidate.activation == transitionType {
-                let triggerKey = [campaign.regionKey, candidate.payload.id, transitionType.rawValue].joined(separator: ":")
+                let triggerKey = [campaign.notificationTriggerScope, candidate.payload.id].joined(separator: ":")
                 let previousTrigger = triggers[triggerKey]
                 guard candidate.canTrigger(
                     previous: previousTrigger,
@@ -310,9 +310,11 @@ enum BubblGeofenceEngine {
             for shape in locationShapes(campaign) {
                 let fallbackKey = "campaign-\(campaignIndex):location-\(result.count)"
                 let keyParts = [campaignId, shape.locationId].compactMap { $0 }
+                let notificationTriggerScope = campaignId ?? "campaign-\(campaignIndex)"
                 result.append(
                     RuntimeGeofenceCampaign(
                         regionKey: keyParts.isEmpty ? fallbackKey : keyParts.joined(separator: ":"),
+                        notificationTriggerScope: notificationTriggerScope,
                         campaignId: campaignId,
                         locationId: shape.locationId,
                         polygon: shape.polygon,
@@ -683,6 +685,7 @@ enum BubblGeofenceEngine {
 
 private struct RuntimeGeofenceCampaign: Sendable, Equatable {
     let regionKey: String
+    let notificationTriggerScope: String
     let campaignId: String?
     let locationId: String?
     let polygon: [GeoPoint]
