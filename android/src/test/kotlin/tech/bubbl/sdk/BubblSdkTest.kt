@@ -51,7 +51,7 @@ class BubblSdkTest {
         assertEquals("/api/device-data", URI(requests.single().url).path)
         assertEquals("POST", requests.single().method)
         assertEquals("sdk-key", requests.single().headers["ApiKey"])
-        assertEquals("3.1.6", requests.single().headers["X-Bubbl-SDK-Version"])
+        assertEquals("3.1.7", requests.single().headers["X-Bubbl-SDK-Version"])
         assertEquals("android", requests.single().headers["X-Bubbl-SDK-Platform"])
         assertNotNull(requests.single().headers["Idempotency-Key"])
         assertNotNull(requests.single().headers["X-Bubbl-Install-ID"])
@@ -818,6 +818,33 @@ class BubblSdkTest {
         assertEquals(NotificationCompat.PRIORITY_HIGH, plan.notificationPriority)
         assertEquals(NotificationCompat.CATEGORY_MESSAGE, plan.notificationCategory)
         assertEquals(NotificationCompat.DEFAULT_ALL, plan.notificationDefaults)
+    }
+
+    @Test
+    fun androidNotificationRenderPlanUsesYoutubeThumbnailForYoutubeMedia() {
+        val payload = BubblNotificationPayload(
+            id = "notification-youtube",
+            title = "Video",
+            body = "Body",
+            media = BubblNotificationMedia(
+                url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                type = "youtube"
+            )
+        )
+
+        val plan = BubblAndroidNotificationRuntime.renderPlan(payload)
+        val media = requireNotNull(payload.media)
+
+        assertEquals(true, plan.shouldUseBigPicture)
+        assertEquals("dQw4w9WgXcQ", BubblMediaUrls.youtubeVideoId(media.url))
+        assertEquals(
+            "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+            BubblMediaUrls.notificationImageUrl(media)
+        )
+        assertEquals(
+            "https://www.youtube.com/embed/dQw4w9WgXcQ?playsinline=1&rel=0&origin=https%3A%2F%2Fbubbl.tech",
+            BubblMediaUrls.youtubeEmbedUrl(media.url)
+        )
     }
 
     @Test

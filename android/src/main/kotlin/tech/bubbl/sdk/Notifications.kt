@@ -21,6 +21,8 @@ import android.graphics.Typeface
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.WebChromeClient
+import android.webkit.WebView
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -43,7 +45,9 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
+import java.net.URLDecoder
 import java.util.Locale
 import kotlin.math.absoluteValue
 
@@ -237,18 +241,56 @@ public class BubblNotificationActivity : Activity() {
         }
 
         payload.media?.let { media ->
-            card.addView(Button(this).apply {
-                text = media.altText ?: "View media"
-                styleSecondaryButton(dp(48), dp(999), dp(1))
-                layoutParams = fullWidthLayout(top = dp(18))
-                setOnClickListener {
-                    scope.launch {
-                        BubblSdk.handleNotificationMediaViewed(payload)
-                        BubblSdk.flush()
+            val youtubeEmbedUrl = BubblMediaUrls.youtubeEmbedUrl(media.url)
+
+            if (youtubeEmbedUrl != null) {
+                card.addView(WebView(this).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.mediaPlaybackRequiresUserGesture = false
+                    webChromeClient = WebChromeClient()
+                    background = roundedBackground(Color.BLACK, dp(16))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(190)
+                    ).apply {
+                        topMargin = dp(18)
                     }
-                    openUrl(media.url)
-                }
-            })
+                    loadDataWithBaseURL(
+                        "https://bubbl.tech",
+                        BubblMediaUrls.youtubeEmbedHtml(youtubeEmbedUrl),
+                        "text/html",
+                        "UTF-8",
+                        null
+                    )
+                })
+
+                card.addView(Button(this).apply {
+                    text = media.altText ?: "Open video"
+                    styleSecondaryButton(dp(48), dp(999), dp(1))
+                    layoutParams = fullWidthLayout(top = dp(10))
+                    setOnClickListener {
+                        scope.launch {
+                            BubblSdk.handleNotificationMediaViewed(payload)
+                            BubblSdk.flush()
+                        }
+                        openUrl(media.url)
+                    }
+                })
+            } else {
+                card.addView(Button(this).apply {
+                    text = media.altText ?: "View media"
+                    styleSecondaryButton(dp(48), dp(999), dp(1))
+                    layoutParams = fullWidthLayout(top = dp(18))
+                    setOnClickListener {
+                        scope.launch {
+                            BubblSdk.handleNotificationMediaViewed(payload)
+                            BubblSdk.flush()
+                        }
+                        openUrl(media.url)
+                    }
+                })
+            }
         }
 
         payload.cta?.let { cta ->
@@ -957,6 +999,105 @@ internal object BubblNotificationPayloadCodec {
         runCatching { enumValueOf<T>(value.orEmpty()) }.getOrDefault(default)
 }
 
+internal object BubblMediaUrls {
+    fun youtubeVideoId(rawUrl: String): String? {
+        val uri = runCatching { URI(rawUrl) }.getOrNull() ?: return null
+        val host = uri.host
+            ?.lowercase(Locale.US)
+            ?.removePrefix("www.")
+            ?: return null
+
+        if (host == "youtu.be") {
+            return validYoutubeId(pathSegments(uri).firstOrNull())
+        }
+
+        if (!host.endsWith("youtube.com") && !host.endsWith("youtube-nocookie.com")) {
+            return null
+        }
+
+        validYoutubeId(queryParameter(uri, "v"))?.let { return it }
+
+        val segments = pathSegments(uri)
+        val markerIndex = segments.indexOfFirst { segment ->
+            segment == "embed" || segment == "shorts" || segment == "v"
+        }
+
+        return if (markerIndex >= 0) {
+            validYoutubeId(segments.getOrNull(markerIndex + 1))
+        } else {
+            null
+        }
+    }
+
+    fun youtubeEmbedUrl(rawUrl: String): String? =
+        youtubeVideoId(rawUrl)?.let {
+            "https://www.youtube.com/embed/$it?playsinline=1&rel=0&origin=https%3A%2F%2Fbubbl.tech"
+        }
+
+    fun youtubeThumbnailUrl(rawUrl: String): String? =
+        youtubeVideoId(rawUrl)?.let { "https://img.youtube.com/vi/$it/hqdefault.jpg" }
+
+    fun youtubeEmbedHtml(embedUrl: String): String =
+        """
+        <!doctype html>
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+              iframe { border: 0; width: 100%; height: 100%; }
+            </style>
+          </head>
+          <body>
+            <iframe src="$embedUrl" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+          </body>
+        </html>
+        """.trimIndent()
+
+    fun notificationImageUrl(media: BubblNotificationMedia): String? =
+        youtubeThumbnailUrl(media.url) ?: media.url.takeIf { isImageMedia(media) }
+
+    private fun isImageMedia(media: BubblNotificationMedia): Boolean {
+        val type = media.type?.lowercase(Locale.US)
+        if (type != null) {
+            return type == "image" || type.startsWith("image/")
+        }
+
+        val path = runCatching { Uri.parse(media.url).path.orEmpty().lowercase(Locale.US) }.getOrDefault("")
+        return path.endsWith(".png") ||
+            path.endsWith(".jpg") ||
+            path.endsWith(".jpeg") ||
+            path.endsWith(".webp") ||
+            path.endsWith(".gif")
+    }
+
+    private fun validYoutubeId(id: String?): String? {
+        val value = id?.trim().orEmpty()
+
+        return value.takeIf { it.matches(Regex("^[A-Za-z0-9_-]{6,}$")) }
+    }
+
+    private fun pathSegments(uri: URI): List<String> =
+        uri.path
+            ?.split("/")
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+
+    private fun queryParameter(uri: URI, name: String): String? =
+        uri.rawQuery
+            ?.split("&")
+            ?.firstNotNullOfOrNull { pair ->
+                val parts = pair.split("=", limit = 2)
+                val key = runCatching { URLDecoder.decode(parts[0], Charsets.UTF_8.name()) }.getOrDefault(parts[0])
+                if (key != name) {
+                    null
+                } else {
+                    val value = parts.getOrNull(1).orEmpty()
+                    runCatching { URLDecoder.decode(value, Charsets.UTF_8.name()) }.getOrDefault(value)
+                }
+            }
+}
+
 internal object BubblAndroidNotificationRuntime {
     private const val channelId = "bubbl_notifications"
     private const val legacyPushChannelId = "bubbl_push"
@@ -979,7 +1120,8 @@ internal object BubblAndroidNotificationRuntime {
 
         val image = payload.media
             ?.takeIf { renderPlan(payload).shouldUseBigPicture }
-            ?.let { downloadBitmap(it.url) }
+            ?.let(BubblMediaUrls::notificationImageUrl)
+            ?.let(::downloadBitmap)
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(payload.title)
@@ -1021,27 +1163,13 @@ internal object BubblAndroidNotificationRuntime {
 
     internal fun renderPlan(payload: BubblNotificationPayload): BubblAndroidNotificationRenderPlan =
         BubblAndroidNotificationRenderPlan(
-            shouldUseBigPicture = payload.media?.let(::isImageMedia) == true,
+            shouldUseBigPicture = payload.media?.let(BubblMediaUrls::notificationImageUrl) != null,
             contentAction = BubblNotificationPayloadCodec.actionDefault,
             ctaAction = payload.cta?.action ?: payload.cta?.let { BubblNotificationPayloadCodec.actionCta },
             notificationPriority = notificationPriority,
             notificationCategory = notificationCategory,
             notificationDefaults = notificationDefaults
         )
-
-    private fun isImageMedia(media: BubblNotificationMedia): Boolean {
-        val type = media.type?.lowercase(Locale.US)
-        if (type != null) {
-            return type == "image" || type.startsWith("image/")
-        }
-
-        val path = runCatching { Uri.parse(media.url).path.orEmpty().lowercase(Locale.US) }.getOrDefault("")
-        return path.endsWith(".png") ||
-            path.endsWith(".jpg") ||
-            path.endsWith(".jpeg") ||
-            path.endsWith(".webp") ||
-            path.endsWith(".gif")
-    }
 
     private fun downloadBitmap(url: String): Bitmap? =
         runCatching {

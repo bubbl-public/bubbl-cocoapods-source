@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.1.6")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.1.7")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -313,6 +313,25 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(
             BubblNotificationAttachmentPlanner.fileName(notificationId: "offer/42", fileExtension: "png"),
             "offer_42.png"
+        )
+    }
+
+    func testNotificationAttachmentPlannerUsesYoutubeThumbnailForYoutubeMedia() throws {
+        let media = BubblNotificationMedia(
+            url: try XCTUnwrap(URL(string: "https://youtu.be/dQw4w9WgXcQ")),
+            type: "youtube",
+            altText: "Watch video"
+        )
+
+        XCTAssertTrue(BubblNotificationAttachmentPlanner.isEligible(media))
+        XCTAssertEqual(BubblNotificationAttachmentPlanner.fileExtension(for: media), "jpg")
+        XCTAssertEqual(
+            BubblNotificationAttachmentPlanner.attachmentURL(for: media)?.absoluteString,
+            "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+        )
+        XCTAssertEqual(
+            BubblNotificationAttachmentPlanner.youtubeEmbedURL(for: media)?.absoluteString,
+            "https://www.youtube.com/embed/dQw4w9WgXcQ?playsinline=1&rel=0&origin=https%3A%2F%2Fbubbl.tech"
         )
     }
 

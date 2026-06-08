@@ -3,6 +3,7 @@ import UserNotifications
 
 #if os(iOS)
 import UIKit
+import WebKit
 #endif
 
 public protocol BubblNotificationPresenting {
@@ -26,6 +27,7 @@ public struct URLSessionBubblNotificationAttachmentLoader: BubblNotificationAtta
 
     public func attachment(for payload: BubblNotificationPayload) async throws -> UNNotificationAttachment? {
         guard let media = payload.media,
+              let attachmentURL = BubblNotificationAttachmentPlanner.attachmentURL(for: media),
               BubblNotificationAttachmentPlanner.isEligible(media),
               let fileExtension = BubblNotificationAttachmentPlanner.fileExtension(for: media) else {
             return nil
@@ -39,7 +41,7 @@ public struct URLSessionBubblNotificationAttachmentLoader: BubblNotificationAtta
         let destination = directory.appendingPathComponent(fileName)
 
         if !FileManager.default.fileExists(atPath: destination.path) {
-            let (temporaryURL, _) = try await URLSession.shared.download(from: media.url)
+            let (temporaryURL, _) = try await URLSession.shared.download(from: attachmentURL)
             if FileManager.default.fileExists(atPath: destination.path) {
                 try FileManager.default.removeItem(at: destination)
             }
@@ -56,6 +58,10 @@ public enum BubblNotificationAttachmentPlanner {
             return false
         }
 
+        if youtubeThumbnailURL(for: media) != nil {
+            return true
+        }
+
         if let type = media.type?.lowercased() {
             return type == "image"
                 || type.hasPrefix("image/")
@@ -69,6 +75,10 @@ public enum BubblNotificationAttachmentPlanner {
     }
 
     public static func fileExtension(for media: BubblNotificationMedia) -> String? {
+        if youtubeThumbnailURL(for: media) != nil {
+            return "jpg"
+        }
+
         let explicit = media.url.pathExtension.lowercased()
         if !explicit.isEmpty {
             return explicit
@@ -101,8 +111,97 @@ public enum BubblNotificationAttachmentPlanner {
                 character.isLetter || character.isNumber || character == "-" || character == "_"
                     ? character
                     : "_"
-            }
+        }
         return "\(String(safeId)).\(fileExtension)"
+    }
+
+    public static func attachmentURL(for media: BubblNotificationMedia) -> URL? {
+        guard media.url.scheme == "http" || media.url.scheme == "https" else {
+            return nil
+        }
+
+        return youtubeThumbnailURL(for: media) ?? media.url
+    }
+
+    public static func youtubeEmbedURL(for media: BubblNotificationMedia) -> URL? {
+        guard let id = youtubeVideoID(from: media.url) else {
+            return nil
+        }
+
+        return URL(string: "https://www.youtube.com/embed/\(id)?playsinline=1&rel=0&origin=https%3A%2F%2Fbubbl.tech")
+    }
+
+    public static func youtubeEmbedHTML(for embedURL: URL) -> String {
+        """
+        <!doctype html>
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+              iframe { border: 0; width: 100%; height: 100%; background: #000; }
+            </style>
+          </head>
+          <body>
+            <iframe src="\(embedURL.absoluteString)" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+          </body>
+        </html>
+        """
+    }
+
+    public static func youtubeThumbnailURL(for media: BubblNotificationMedia) -> URL? {
+        guard let id = youtubeVideoID(from: media.url) else {
+            return nil
+        }
+
+        return URL(string: "https://img.youtube.com/vi/\(id)/hqdefault.jpg")
+    }
+
+    private static func youtubeVideoID(from url: URL) -> String? {
+        guard var host = url.host?.lowercased() else {
+            return nil
+        }
+
+        if host.hasPrefix("www.") {
+            host.removeFirst(4)
+        }
+
+        let segments = url.pathComponents.filter { $0 != "/" }
+
+        if host == "youtu.be" {
+            return validYoutubeID(segments.first)
+        }
+
+        guard host.hasSuffix("youtube.com") || host.hasSuffix("youtube-nocookie.com") else {
+            return nil
+        }
+
+        if let queryId = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "v" })?
+            .value,
+           let valid = validYoutubeID(queryId) {
+            return valid
+        }
+
+        for marker in ["embed", "shorts", "v"] {
+            if let index = segments.firstIndex(of: marker),
+               segments.indices.contains(index + 1),
+               let valid = validYoutubeID(segments[index + 1]) {
+                return valid
+            }
+        }
+
+        return nil
+    }
+
+    private static func validYoutubeID(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              value.range(of: #"^[A-Za-z0-9_-]{6,}$"#, options: .regularExpression) != nil else {
+            return nil
+        }
+
+        return value
     }
 }
 
@@ -405,15 +504,28 @@ public final class BubblNotificationViewController: UIViewController {
         }
 
         if let media = payload.media {
-            let button = secondaryButton(media.altText ?? "View media") { [weak self] in
-                guard let self else { return }
-                Task {
-                    try? await self.sdk.handleNotificationMediaViewed(self.payload)
-                    _ = await self.sdk.flush()
+            if let embedURL = BubblNotificationAttachmentPlanner.youtubeEmbedURL(for: media) {
+                stack.addArrangedSubview(youtubeMediaView(embedURL: embedURL))
+                let button = secondaryButton(media.altText ?? "Open video") { [weak self] in
+                    guard let self else { return }
+                    Task {
+                        try? await self.sdk.handleNotificationMediaViewed(self.payload)
+                        _ = await self.sdk.flush()
+                    }
+                    UIApplication.shared.open(media.url)
                 }
-                UIApplication.shared.open(media.url)
+                stack.addArrangedSubview(button)
+            } else {
+                let button = secondaryButton(media.altText ?? "View media") { [weak self] in
+                    guard let self else { return }
+                    Task {
+                        try? await self.sdk.handleNotificationMediaViewed(self.payload)
+                        _ = await self.sdk.flush()
+                    }
+                    UIApplication.shared.open(media.url)
+                }
+                stack.addArrangedSubview(button)
             }
-            stack.addArrangedSubview(button)
         }
 
         if let cta = payload.cta {
@@ -563,6 +675,26 @@ public final class BubblNotificationViewController: UIViewController {
         button.layer.borderColor = UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1).cgColor
         button.layer.borderWidth = 1
         return button
+    }
+
+    private func youtubeMediaView(embedURL: URL) -> UIView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        if #available(iOS 10.0, *) {
+            configuration.mediaTypesRequiringUserActionForPlayback = []
+        }
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.backgroundColor = .black
+        webView.scrollView.isScrollEnabled = false
+        webView.layer.cornerRadius = 16
+        webView.clipsToBounds = true
+        webView.heightAnchor.constraint(equalToConstant: 210).isActive = true
+        webView.loadHTMLString(
+            BubblNotificationAttachmentPlanner.youtubeEmbedHTML(for: embedURL),
+            baseURL: URL(string: "https://bubbl.tech")
+        )
+        return webView
     }
 
     private func makeChoiceButton(_ title: String) -> UIButton {

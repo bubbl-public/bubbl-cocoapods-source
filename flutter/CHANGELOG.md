@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.7
+
+- Aligns the Flutter wrapper with the native SDK 3.1.7 release.
+- Android and iOS default notification modals now embed YouTube media in-app instead of handing off externally.
+
 ## 3.1.6
 
 - Aligns the Flutter wrapper with the native SDK 3.1.6 release.
