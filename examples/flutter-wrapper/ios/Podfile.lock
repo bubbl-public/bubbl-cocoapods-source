@@ -19,8 +19,8 @@ EXTERNAL SOURCES:
     :path: Flutter
 
 SPEC CHECKSUMS:
-  bubbl_flutter_sdk: 17ac5bec1af37ac919cc15272e14cb7980df7288
-  BubblSDK: 40cef94d3567160857c79b0f7df705ac6b6e1cc6
+  bubbl_flutter_sdk: 833e651cec6fe8741d0b95fe9aecbfce5c5e21af
+  BubblSDK: 8fe6473ab5faa73ba856792780f8f182f2bfb66a
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
 
 PODFILE CHECKSUM: 00a5ad29d5540e06bfdb6ad8341fc266e2c68453

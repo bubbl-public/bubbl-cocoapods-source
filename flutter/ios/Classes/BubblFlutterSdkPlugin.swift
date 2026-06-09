@@ -1,6 +1,7 @@
 import Flutter
 import Foundation
 import BubblSDK
+import UIKit
 
 #if canImport(CoreLocation)
 import CoreLocation
@@ -31,6 +32,7 @@ public final class BubblFlutterSdkPlugin: NSObject, FlutterPlugin, FlutterStream
         )
 
         registrar.addMethodCallDelegate(instance, channel: methodChannel)
+        registrar.addApplicationDelegate(instance)
         eventChannel.setStreamHandler(instance)
     }
 
@@ -78,7 +80,14 @@ public final class BubblFlutterSdkPlugin: NSObject, FlutterPlugin, FlutterStream
     private func handleAsync(_ call: FlutterMethodCall) async throws -> Any? {
         switch call.method {
         case "boot":
-            return try await sdk.boot(call.argumentsMap().bubblConfig()).flutterMap()
+            let config = try call.argumentsMap().bubblConfig()
+            let bootResult = try await sdk.boot(config)
+            if config.enablePushHandling {
+                await MainActor.run {
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+            }
+            return bootResult.flutterMap()
         case "shutdown":
             await sdk.shutdown()
             return nil
@@ -162,6 +171,34 @@ public final class BubblFlutterSdkPlugin: NSObject, FlutterPlugin, FlutterStream
         default:
             throw BubblFlutterPluginError(code: "not_implemented", message: "Unknown Bubbl Flutter method: \(call.method)")
         }
+    }
+
+    public func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Task {
+            try? await sdk.updateAPNsToken(deviceToken)
+        }
+    }
+
+    public func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        // Hosts can still observe APNs registration failures from their app delegate.
+    }
+
+    public func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) -> Bool {
+        Task {
+            let payload = try? await sdk.handleRemoteNotification(userInfo)
+            completionHandler(payload == nil ? .noData : .newData)
+        }
+        return true
     }
 }
 
