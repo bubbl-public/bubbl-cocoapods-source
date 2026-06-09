@@ -6,6 +6,56 @@ enum BubblNotificationRenderingMode { sdkDefault, hostRendered, eventOnly }
 
 enum BubblNotificationSource { firebase, apns, runtime, geofence, manual }
 
+enum BubblNotificationModalTheme { light, dark }
+
+class BubblNotificationModalStyle {
+  const BubblNotificationModalStyle({
+    this.theme = BubblNotificationModalTheme.light,
+    this.transparentBackdrop = true,
+    this.backdropColor,
+    this.cardBackgroundColor,
+    this.cardBorderColor,
+    this.titleColor,
+    this.bodyColor,
+    this.accentColor,
+    this.iconBackgroundColor,
+    this.iconTextColor,
+    this.primaryButtonBackgroundColor,
+    this.primaryButtonTextColor,
+    this.secondaryButtonBackgroundColor,
+    this.secondaryButtonTextColor,
+    this.textButtonColor,
+    this.surveyBackgroundColor,
+    this.inputBackgroundColor,
+    this.inputTextColor,
+    this.inputBorderColor,
+    this.cornerRadius,
+    this.buttonCornerRadius,
+  });
+
+  final BubblNotificationModalTheme theme;
+  final bool transparentBackdrop;
+  final String? backdropColor;
+  final String? cardBackgroundColor;
+  final String? cardBorderColor;
+  final String? titleColor;
+  final String? bodyColor;
+  final String? accentColor;
+  final String? iconBackgroundColor;
+  final String? iconTextColor;
+  final String? primaryButtonBackgroundColor;
+  final String? primaryButtonTextColor;
+  final String? secondaryButtonBackgroundColor;
+  final String? secondaryButtonTextColor;
+  final String? textButtonColor;
+  final String? surveyBackgroundColor;
+  final String? inputBackgroundColor;
+  final String? inputTextColor;
+  final String? inputBorderColor;
+  final double? cornerRadius;
+  final double? buttonCornerRadius;
+}
+
 class BubblConfig {
   const BubblConfig({
     required this.apiKey,
@@ -21,6 +71,7 @@ class BubblConfig {
     this.enableLocationTracking = false,
     this.notificationRenderingMode = BubblNotificationRenderingMode.sdkDefault,
     this.enableDefaultNotificationModal = true,
+    this.defaultNotificationModalStyle,
     this.enableDefaultSurveyUi = true,
     this.logLevel = BubblLogLevel.warn,
   });
@@ -38,6 +89,7 @@ class BubblConfig {
   final bool enableLocationTracking;
   final BubblNotificationRenderingMode notificationRenderingMode;
   final bool enableDefaultNotificationModal;
+  final BubblNotificationModalStyle? defaultNotificationModalStyle;
   final bool enableDefaultSurveyUi;
   final BubblLogLevel logLevel;
 }
@@ -286,7 +338,7 @@ class BubblFlushResult {
 
 class BubblDiagnostics {
   const BubblDiagnostics({
-    this.sdkVersion = '3.1.7',
+    this.sdkVersion = '4.0.0',
     this.platform = 'flutter',
     this.booted = false,
     this.pendingIngestCount = 0,

@@ -17,6 +17,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.ColorDrawable
 import android.graphics.Typeface
 import android.view.Gravity
 import android.view.View
@@ -155,6 +156,9 @@ public class BubblNotificationActivity : Activity() {
     private fun defaultContentView(payload: BubblNotificationPayload): View {
         val density = resources.displayMetrics.density
         fun dp(value: Int): Int = (value * density).toInt()
+        val palette = BubblNotificationModalPalette(BubblSdk.defaultNotificationModalStyle())
+
+        window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -164,7 +168,7 @@ public class BubblNotificationActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
             setPadding(dp(20), dp(24), dp(20), dp(24))
-            setBackgroundColor(Color.rgb(244, 247, 251))
+            setBackgroundColor(palette.backdropColor)
         }
 
         val scrollView = ScrollView(this).apply {
@@ -189,7 +193,7 @@ public class BubblNotificationActivity : Activity() {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            background = roundedBackground(Color.WHITE, dp(24), Color.rgb(224, 231, 241), dp(1))
+            background = roundedBackground(palette.cardBackgroundColor, dp(palette.cornerRadiusDp), palette.cardBorderColor, dp(1))
             elevation = dp(10).toFloat()
             setPadding(dp(24), dp(24), dp(24), dp(22))
             layoutParams = LinearLayout.LayoutParams(
@@ -205,8 +209,8 @@ public class BubblNotificationActivity : Activity() {
             textSize = 26f
             gravity = Gravity.CENTER
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.rgb(7, 17, 31))
-            background = roundedBackground(Color.rgb(41, 196, 186), dp(26))
+            setTextColor(palette.iconTextColor)
+            background = roundedBackground(palette.iconBackgroundColor, dp(26))
             layoutParams = LinearLayout.LayoutParams(dp(52), dp(52)).apply {
                 bottomMargin = dp(16)
             }
@@ -218,7 +222,7 @@ public class BubblNotificationActivity : Activity() {
             textSize = 23f
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            setTextColor(Color.rgb(7, 17, 31))
+            setTextColor(palette.titleColor)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -231,7 +235,7 @@ public class BubblNotificationActivity : Activity() {
                 textSize = 15f
                 gravity = Gravity.CENTER
                 setLineSpacing(dp(2).toFloat(), 1f)
-                setTextColor(Color.rgb(75, 85, 103))
+                setTextColor(palette.bodyColor)
                 setPadding(0, dp(12), 0, 0)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -267,7 +271,7 @@ public class BubblNotificationActivity : Activity() {
 
                 card.addView(Button(this).apply {
                     text = media.altText ?: "Open video"
-                    styleSecondaryButton(dp(48), dp(999), dp(1))
+                    styleSecondaryButton(dp(48), dp(palette.buttonCornerRadiusDp), dp(1), palette)
                     layoutParams = fullWidthLayout(top = dp(10))
                     setOnClickListener {
                         scope.launch {
@@ -280,7 +284,7 @@ public class BubblNotificationActivity : Activity() {
             } else {
                 card.addView(Button(this).apply {
                     text = media.altText ?: "View media"
-                    styleSecondaryButton(dp(48), dp(999), dp(1))
+                    styleSecondaryButton(dp(48), dp(palette.buttonCornerRadiusDp), dp(1), palette)
                     layoutParams = fullWidthLayout(top = dp(18))
                     setOnClickListener {
                         scope.launch {
@@ -296,7 +300,7 @@ public class BubblNotificationActivity : Activity() {
         payload.cta?.let { cta ->
             card.addView(Button(this).apply {
                 text = cta.label
-                stylePrimaryButton(dp(52), dp(999))
+                stylePrimaryButton(dp(52), dp(palette.buttonCornerRadiusDp), palette)
                 layoutParams = fullWidthLayout(top = dp(18))
                 setOnClickListener {
                     scope.launch {
@@ -316,7 +320,7 @@ public class BubblNotificationActivity : Activity() {
             val surveyPanel = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_HORIZONTAL
-                background = roundedBackground(Color.rgb(248, 250, 252), dp(18), Color.rgb(224, 231, 241), dp(1))
+                background = roundedBackground(palette.surveyBackgroundColor, dp(18), palette.cardBorderColor, dp(1))
                 setPadding(dp(16), dp(16), dp(16), dp(16))
                 layoutParams = fullWidthLayout(top = dp(18))
             }
@@ -329,7 +333,7 @@ public class BubblNotificationActivity : Activity() {
                     textSize = 15f
                     typeface = Typeface.DEFAULT_BOLD
                     gravity = Gravity.CENTER
-                    setTextColor(Color.rgb(7, 17, 31))
+                    setTextColor(palette.titleColor)
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -353,9 +357,9 @@ public class BubblNotificationActivity : Activity() {
                             tag = choice.id
                             textSize = 14f
                             typeface = Typeface.DEFAULT_BOLD
-                            setTextColor(Color.rgb(7, 17, 31))
-                            buttonTintList = android.content.res.ColorStateList.valueOf(Color.rgb(41, 196, 186))
-                            background = roundedBackground(Color.WHITE, dp(999), Color.rgb(224, 231, 241), dp(1))
+                            setTextColor(palette.inputTextColor)
+                            buttonTintList = android.content.res.ColorStateList.valueOf(palette.primaryButtonBackgroundColor)
+                            background = roundedBackground(palette.inputBackgroundColor, dp(palette.buttonCornerRadiusDp), palette.inputBorderColor, dp(1))
                             setPadding(dp(14), dp(10), dp(14), dp(10))
                             layoutParams = RadioGroup.LayoutParams(
                                 RadioGroup.LayoutParams.MATCH_PARENT,
@@ -379,9 +383,9 @@ public class BubblNotificationActivity : Activity() {
                         hint = "Your answer"
                         minLines = 2
                         textSize = 15f
-                        setTextColor(Color.rgb(7, 17, 31))
-                        setHintTextColor(Color.rgb(119, 128, 145))
-                        background = roundedBackground(Color.WHITE, dp(14), Color.rgb(203, 213, 225), dp(1))
+                        setTextColor(palette.inputTextColor)
+                        setHintTextColor(palette.bodyColor)
+                        background = roundedBackground(palette.inputBackgroundColor, dp(14), palette.inputBorderColor, dp(1))
                         setPadding(dp(14), dp(12), dp(14), dp(12))
                         layoutParams = LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -401,7 +405,7 @@ public class BubblNotificationActivity : Activity() {
 
             surveyPanel.addView(Button(this).apply {
                 text = "Submit"
-                stylePrimaryButton(dp(52), dp(999))
+                stylePrimaryButton(dp(52), dp(palette.buttonCornerRadiusDp), palette)
                 layoutParams = fullWidthLayout(top = dp(6))
                 setOnClickListener {
                     isEnabled = false
@@ -433,7 +437,7 @@ public class BubblNotificationActivity : Activity() {
 
         card.addView(Button(this).apply {
             text = "Close"
-            styleTextButton()
+            styleTextButton(palette)
             layoutParams = fullWidthLayout(top = dp(14))
             setOnClickListener { finish() }
         })
@@ -480,29 +484,34 @@ public class BubblNotificationActivity : Activity() {
             topMargin = top
         }
 
-    private fun Button.stylePrimaryButton(minButtonHeight: Int, cornerRadius: Int) {
+    private fun Button.stylePrimaryButton(minButtonHeight: Int, cornerRadius: Int, palette: BubblNotificationModalPalette) {
         minHeight = minButtonHeight
         textSize = 15f
         typeface = Typeface.DEFAULT_BOLD
         isAllCaps = false
-        setTextColor(Color.rgb(7, 17, 31))
-        background = roundedBackground(Color.rgb(41, 196, 186), cornerRadius)
+        setTextColor(palette.primaryButtonTextColor)
+        background = roundedBackground(palette.primaryButtonBackgroundColor, cornerRadius)
     }
 
-    private fun Button.styleSecondaryButton(minButtonHeight: Int, cornerRadius: Int, strokeWidth: Int) {
+    private fun Button.styleSecondaryButton(
+        minButtonHeight: Int,
+        cornerRadius: Int,
+        strokeWidth: Int,
+        palette: BubblNotificationModalPalette
+    ) {
         minHeight = minButtonHeight
         textSize = 15f
         typeface = Typeface.DEFAULT_BOLD
         isAllCaps = false
-        setTextColor(Color.rgb(7, 17, 31))
-        background = roundedBackground(Color.rgb(236, 242, 249), cornerRadius, Color.rgb(224, 231, 241), strokeWidth)
+        setTextColor(palette.secondaryButtonTextColor)
+        background = roundedBackground(palette.secondaryButtonBackgroundColor, cornerRadius, palette.cardBorderColor, strokeWidth)
     }
 
-    private fun Button.styleTextButton() {
+    private fun Button.styleTextButton(palette: BubblNotificationModalPalette) {
         textSize = 15f
         typeface = Typeface.DEFAULT_BOLD
         isAllCaps = false
-        setTextColor(Color.rgb(75, 85, 103))
+        setTextColor(palette.textButtonColor)
         background = null
     }
 
@@ -524,6 +533,47 @@ public class BubblNotificationActivity : Activity() {
         BubblNotificationPayloadCodec.addToIntent(launchIntent, payload, action)
         runCatching { startActivity(launchIntent) }
     }
+}
+
+private class BubblNotificationModalPalette(style: BubblNotificationModalStyle) {
+    private val dark = style.theme == BubblNotificationModalTheme.Dark
+    private val ink = if (dark) Color.rgb(242, 247, 255) else Color.rgb(7, 17, 31)
+    private val slate = if (dark) Color.rgb(194, 209, 230) else Color.rgb(75, 85, 103)
+    private val card = if (dark) Color.rgb(10, 20, 36) else Color.WHITE
+    private val panel = if (dark) Color.rgb(18, 31, 51) else Color.rgb(248, 250, 252)
+    private val border = if (dark) Color.rgb(46, 66, 92) else Color.rgb(224, 231, 241)
+    private val input = if (dark) Color.rgb(5, 13, 23) else Color.WHITE
+    private val secondary = if (dark) Color.rgb(31, 46, 69) else Color.rgb(236, 242, 249)
+    private val teal = Color.rgb(41, 196, 186)
+
+    val backdropColor: Int = if (style.transparentBackdrop) {
+        Color.TRANSPARENT
+    } else {
+        color(style.backdropColor, Color.argb(82, 0, 0, 0))
+    }
+    val cardBackgroundColor: Int = color(style.cardBackgroundColor, card)
+    val cardBorderColor: Int = color(style.cardBorderColor, border)
+    val titleColor: Int = color(style.titleColor, ink)
+    val bodyColor: Int = color(style.bodyColor, slate)
+    val iconBackgroundColor: Int = color(style.iconBackgroundColor ?: style.accentColor, teal)
+    val iconTextColor: Int = color(style.iconTextColor, if (dark) Color.rgb(5, 13, 23) else ink)
+    val primaryButtonBackgroundColor: Int = color(style.primaryButtonBackgroundColor ?: style.accentColor, teal)
+    val primaryButtonTextColor: Int = color(style.primaryButtonTextColor, if (dark) Color.rgb(5, 13, 23) else ink)
+    val secondaryButtonBackgroundColor: Int = color(style.secondaryButtonBackgroundColor, secondary)
+    val secondaryButtonTextColor: Int = color(style.secondaryButtonTextColor, ink)
+    val textButtonColor: Int = color(style.textButtonColor, slate)
+    val surveyBackgroundColor: Int = color(style.surveyBackgroundColor, panel)
+    val inputBackgroundColor: Int = color(style.inputBackgroundColor, input)
+    val inputTextColor: Int = color(style.inputTextColor, ink)
+    val inputBorderColor: Int = color(style.inputBorderColor, if (dark) border else Color.rgb(203, 213, 225))
+    val cornerRadiusDp: Int = (style.cornerRadius ?: 24.0).toInt().coerceIn(0, 64)
+    val buttonCornerRadiusDp: Int = (style.buttonCornerRadius ?: 999.0).toInt().coerceIn(0, 999)
+
+    private fun color(value: String?, fallback: Int): Int =
+        runCatching {
+            val raw = value?.trim().orEmpty()
+            if (raw.isEmpty()) fallback else Color.parseColor(raw)
+        }.getOrDefault(fallback)
 }
 
 internal object BubblNotificationPayloadParser {

@@ -9,6 +9,31 @@ export type BubblEnvironment = 'development' | 'staging' | 'production';
 export type BubblLogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';
 export type BubblNotificationRenderingMode = 'sdkDefault' | 'hostRendered' | 'eventOnly';
 export type BubblNotificationSource = 'firebase' | 'apns' | 'runtime' | 'geofence' | 'manual';
+export type BubblNotificationModalTheme = 'light' | 'dark';
+
+export type BubblNotificationModalStyle = {
+  theme?: BubblNotificationModalTheme;
+  transparentBackdrop?: boolean;
+  backdropColor?: string | null;
+  cardBackgroundColor?: string | null;
+  cardBorderColor?: string | null;
+  titleColor?: string | null;
+  bodyColor?: string | null;
+  accentColor?: string | null;
+  iconBackgroundColor?: string | null;
+  iconTextColor?: string | null;
+  primaryButtonBackgroundColor?: string | null;
+  primaryButtonTextColor?: string | null;
+  secondaryButtonBackgroundColor?: string | null;
+  secondaryButtonTextColor?: string | null;
+  textButtonColor?: string | null;
+  surveyBackgroundColor?: string | null;
+  inputBackgroundColor?: string | null;
+  inputTextColor?: string | null;
+  inputBorderColor?: string | null;
+  cornerRadius?: number | null;
+  buttonCornerRadius?: number | null;
+};
 
 export type BubblConfig = {
   apiKey: string;
@@ -24,6 +49,7 @@ export type BubblConfig = {
   enableLocationTracking?: boolean;
   notificationRenderingMode?: BubblNotificationRenderingMode;
   enableDefaultNotificationModal?: boolean;
+  defaultNotificationModalStyle?: BubblNotificationModalStyle | null;
   enableDefaultSurveyUi?: boolean;
   logLevel?: BubblLogLevel;
 };
@@ -236,6 +262,12 @@ export const Bubbl = {
   },
   async setDefaultNotificationModalEnabled(enabled: boolean): Promise<void> {
     return nativeModule().setDefaultNotificationModalEnabled(enabled);
+  },
+  async setDefaultNotificationModalStyle(style: BubblNotificationModalStyle | null): Promise<void> {
+    return nativeModule().setDefaultNotificationModalStyle(style);
+  },
+  async resetDefaultNotificationModalStyle(): Promise<void> {
+    return nativeModule().setDefaultNotificationModalStyle(null);
   },
   async disableDefaultNotificationModal(): Promise<void> {
     return nativeModule().setDefaultNotificationModalEnabled(false);

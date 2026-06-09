@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.0
+
+- Primes iOS native background region monitoring when location tracking starts and after geofence/location refresh calls, so background geofence notifications can fire without relying on foreground JavaScript execution.
+- Adds an iOS launch-options helper so React Native apps can restore persisted SDK state and resume native geofence monitoring before the bridge or JavaScript UI mounts.
+- Aligns the React Native wrapper with the native SDK 4.0.0 release.
+
 ## 3.1.7
 
 - Aligns the React Native wrapper with the native SDK 3.1.7 release.

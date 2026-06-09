@@ -156,6 +156,17 @@ public final actor BubblClient {
         try saveConfig(nextConfig)
     }
 
+    public func setDefaultNotificationModalStyle(_ style: BubblNotificationModalStyle?) async throws {
+        var nextConfig = try requireConfig()
+        nextConfig.defaultNotificationModalStyle = style
+        config = nextConfig
+        try saveConfig(nextConfig)
+    }
+
+    public func defaultNotificationModalStyle() async -> BubblNotificationModalStyle {
+        config?.defaultNotificationModalStyle ?? .default
+    }
+
     public func registerPushToken(_ token: String) async throws {
         try restoreRuntimeStateIfNeeded()
         let activeConfig = try requireConfig()

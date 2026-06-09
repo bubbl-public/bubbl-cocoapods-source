@@ -68,6 +68,17 @@ class BubblSdk {
         'enabled': enabled,
       });
 
+  Future<void> setDefaultNotificationModalStyle(
+    BubblNotificationModalStyle? style,
+  ) =>
+      _invokeVoid(
+        'setDefaultNotificationModalStyle',
+        <String, Object?>{'style': style?._toMap()},
+      );
+
+  Future<void> resetDefaultNotificationModalStyle() =>
+      setDefaultNotificationModalStyle(null);
+
   Future<void> disableDefaultNotificationModal() =>
       setDefaultNotificationModalEnabled(false);
 
@@ -187,8 +198,42 @@ extension on BubblConfig {
     'enableLocationTracking': enableLocationTracking,
     'notificationRenderingMode': notificationRenderingMode.name,
     'enableDefaultNotificationModal': enableDefaultNotificationModal,
+    if (defaultNotificationModalStyle != null)
+      'defaultNotificationModalStyle': defaultNotificationModalStyle!._toMap(),
     'enableDefaultSurveyUi': enableDefaultSurveyUi,
     'logLevel': logLevel.name,
+  };
+}
+
+extension on BubblNotificationModalStyle {
+  Map<String, Object?> _toMap() => <String, Object?>{
+    'theme': theme.name,
+    'transparentBackdrop': transparentBackdrop,
+    if (backdropColor != null) 'backdropColor': backdropColor,
+    if (cardBackgroundColor != null) 'cardBackgroundColor': cardBackgroundColor,
+    if (cardBorderColor != null) 'cardBorderColor': cardBorderColor,
+    if (titleColor != null) 'titleColor': titleColor,
+    if (bodyColor != null) 'bodyColor': bodyColor,
+    if (accentColor != null) 'accentColor': accentColor,
+    if (iconBackgroundColor != null) 'iconBackgroundColor': iconBackgroundColor,
+    if (iconTextColor != null) 'iconTextColor': iconTextColor,
+    if (primaryButtonBackgroundColor != null)
+      'primaryButtonBackgroundColor': primaryButtonBackgroundColor,
+    if (primaryButtonTextColor != null)
+      'primaryButtonTextColor': primaryButtonTextColor,
+    if (secondaryButtonBackgroundColor != null)
+      'secondaryButtonBackgroundColor': secondaryButtonBackgroundColor,
+    if (secondaryButtonTextColor != null)
+      'secondaryButtonTextColor': secondaryButtonTextColor,
+    if (textButtonColor != null) 'textButtonColor': textButtonColor,
+    if (surveyBackgroundColor != null)
+      'surveyBackgroundColor': surveyBackgroundColor,
+    if (inputBackgroundColor != null)
+      'inputBackgroundColor': inputBackgroundColor,
+    if (inputTextColor != null) 'inputTextColor': inputTextColor,
+    if (inputBorderColor != null) 'inputBorderColor': inputBorderColor,
+    if (cornerRadius != null) 'cornerRadius': cornerRadius,
+    if (buttonCornerRadius != null) 'buttonCornerRadius': buttonCornerRadius,
   };
 }
 
@@ -323,7 +368,7 @@ BubblConfiguration _configurationFromMap(Map<String, Object?> map) =>
 
 BubblDiagnostics _diagnosticsFromMap(Map<String, Object?> map) =>
     BubblDiagnostics(
-      sdkVersion: map['sdkVersion']?.toString() ?? '3.1.7',
+      sdkVersion: map['sdkVersion']?.toString() ?? '4.0.0',
       platform: map['platform']?.toString() ?? 'flutter',
       booted: _bool(map['booted']),
       pendingIngestCount: _int(map['pendingIngestCount']),

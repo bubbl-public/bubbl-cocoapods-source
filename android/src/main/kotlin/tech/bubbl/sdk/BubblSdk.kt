@@ -221,6 +221,12 @@ object BubblSdk {
         store.saveConfig(nextConfig)
     }
 
+    suspend fun setDefaultNotificationModalStyle(style: BubblNotificationModalStyle?) {
+        val nextConfig = requireConfig().copy(defaultNotificationModalStyle = style)
+        config = nextConfig
+        store.saveConfig(nextConfig)
+    }
+
     suspend fun registerPushToken(token: String) {
         val activeConfig = requireConfig()
         val nextState = requireState().copy(pushToken = token)
@@ -770,6 +776,9 @@ object BubblSdk {
 
     internal fun defaultNotificationModalEnabled(): Boolean =
         config?.enableDefaultNotificationModal ?: true
+
+    internal fun defaultNotificationModalStyle(): BubblNotificationModalStyle =
+        config?.defaultNotificationModalStyle ?: BubblNotificationModalStyle()
 
     internal suspend fun refreshGeofenceFromLastKnownLocation(context: Context): Boolean {
         val activeConfig = config ?: return false

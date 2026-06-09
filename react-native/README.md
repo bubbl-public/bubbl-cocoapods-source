@@ -35,6 +35,21 @@ bundled foreground location service and WorkManager restore/refresh path, and
 iOS uses the bundled CoreLocation monitor. The host app still owns platform
 declarations and runtime permission UX.
 
+For iOS background geofence cold starts, forward launch options from your
+`AppDelegate` before the React Native bridge or JavaScript UI is mounted:
+
+```swift
+import BubblReactNativeSdk
+
+func application(
+  _ application: UIApplication,
+  didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+) -> Bool {
+  BubblSdkLocationLaunchHandler.handleLaunchOptions(launchOptions as NSDictionary?)
+  return true
+}
+```
+
 For apps that render their own in-app notification modal while still letting
 the native SDK trigger device notifications:
 

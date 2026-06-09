@@ -15,6 +15,7 @@ export type BubblBootOptions = {
   enableLocationTracking?: boolean;
   notificationRenderingMode?: string;
   enableDefaultNotificationModal?: boolean;
+  defaultNotificationModalStyle?: Object | null;
   enableDefaultSurveyUi?: boolean;
   logLevel?: string;
 };
@@ -34,6 +35,7 @@ export interface Spec extends TurboModule {
   setCorrelationId(value: string): Promise<void>;
   clearCorrelationId(): Promise<void>;
   setDefaultNotificationModalEnabled(enabled: boolean): Promise<void>;
+  setDefaultNotificationModalStyle(style?: Object | null): Promise<void>;
   registerPushToken(token: string): Promise<void>;
   handleFirebasePayload(payload: Object): Promise<Object | null>;
   showNotification(payload: Object): Promise<Object>;

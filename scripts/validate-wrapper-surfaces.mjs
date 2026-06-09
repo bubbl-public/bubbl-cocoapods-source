@@ -18,6 +18,7 @@ const requiredMethods = [
   'setCorrelationId',
   'clearCorrelationId',
   'setDefaultNotificationModalEnabled',
+  'setDefaultNotificationModalStyle',
   'registerPushToken',
   'handleFirebasePayload',
   'showNotification',

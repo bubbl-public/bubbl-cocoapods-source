@@ -14,6 +14,7 @@ public struct BubblConfig: Sendable, Codable, Equatable {
     public var enableLocationTracking: Bool
     public var notificationRenderingMode: BubblNotificationRenderingMode
     public var enableDefaultNotificationModal: Bool
+    public var defaultNotificationModalStyle: BubblNotificationModalStyle?
     public var enableDefaultSurveyUi: Bool
     public var logLevel: BubblLogLevel
 
@@ -31,6 +32,7 @@ public struct BubblConfig: Sendable, Codable, Equatable {
         enableLocationTracking: Bool = false,
         notificationRenderingMode: BubblNotificationRenderingMode = .sdkDefault,
         enableDefaultNotificationModal: Bool = true,
+        defaultNotificationModalStyle: BubblNotificationModalStyle? = nil,
         enableDefaultSurveyUi: Bool = true,
         logLevel: BubblLogLevel = .warn
     ) {
@@ -47,6 +49,7 @@ public struct BubblConfig: Sendable, Codable, Equatable {
         self.enableLocationTracking = enableLocationTracking
         self.notificationRenderingMode = notificationRenderingMode
         self.enableDefaultNotificationModal = enableDefaultNotificationModal
+        self.defaultNotificationModalStyle = defaultNotificationModalStyle
         self.enableDefaultSurveyUi = enableDefaultSurveyUi
         self.logLevel = logLevel
     }
@@ -85,6 +88,83 @@ public enum BubblNotificationSource: String, Sendable, Codable {
     case runtime
     case geofence
     case manual
+}
+
+public enum BubblNotificationModalTheme: String, Sendable, Codable, Equatable {
+    case light
+    case dark
+}
+
+public struct BubblNotificationModalStyle: Sendable, Codable, Equatable {
+    public var theme: BubblNotificationModalTheme
+    public var transparentBackdrop: Bool
+    public var backdropColor: String?
+    public var cardBackgroundColor: String?
+    public var cardBorderColor: String?
+    public var titleColor: String?
+    public var bodyColor: String?
+    public var accentColor: String?
+    public var iconBackgroundColor: String?
+    public var iconTextColor: String?
+    public var primaryButtonBackgroundColor: String?
+    public var primaryButtonTextColor: String?
+    public var secondaryButtonBackgroundColor: String?
+    public var secondaryButtonTextColor: String?
+    public var textButtonColor: String?
+    public var surveyBackgroundColor: String?
+    public var inputBackgroundColor: String?
+    public var inputTextColor: String?
+    public var inputBorderColor: String?
+    public var cornerRadius: Double?
+    public var buttonCornerRadius: Double?
+
+    public init(
+        theme: BubblNotificationModalTheme = .light,
+        transparentBackdrop: Bool = true,
+        backdropColor: String? = nil,
+        cardBackgroundColor: String? = nil,
+        cardBorderColor: String? = nil,
+        titleColor: String? = nil,
+        bodyColor: String? = nil,
+        accentColor: String? = nil,
+        iconBackgroundColor: String? = nil,
+        iconTextColor: String? = nil,
+        primaryButtonBackgroundColor: String? = nil,
+        primaryButtonTextColor: String? = nil,
+        secondaryButtonBackgroundColor: String? = nil,
+        secondaryButtonTextColor: String? = nil,
+        textButtonColor: String? = nil,
+        surveyBackgroundColor: String? = nil,
+        inputBackgroundColor: String? = nil,
+        inputTextColor: String? = nil,
+        inputBorderColor: String? = nil,
+        cornerRadius: Double? = nil,
+        buttonCornerRadius: Double? = nil
+    ) {
+        self.theme = theme
+        self.transparentBackdrop = transparentBackdrop
+        self.backdropColor = backdropColor
+        self.cardBackgroundColor = cardBackgroundColor
+        self.cardBorderColor = cardBorderColor
+        self.titleColor = titleColor
+        self.bodyColor = bodyColor
+        self.accentColor = accentColor
+        self.iconBackgroundColor = iconBackgroundColor
+        self.iconTextColor = iconTextColor
+        self.primaryButtonBackgroundColor = primaryButtonBackgroundColor
+        self.primaryButtonTextColor = primaryButtonTextColor
+        self.secondaryButtonBackgroundColor = secondaryButtonBackgroundColor
+        self.secondaryButtonTextColor = secondaryButtonTextColor
+        self.textButtonColor = textButtonColor
+        self.surveyBackgroundColor = surveyBackgroundColor
+        self.inputBackgroundColor = inputBackgroundColor
+        self.inputTextColor = inputTextColor
+        self.inputBorderColor = inputBorderColor
+        self.cornerRadius = cornerRadius
+        self.buttonCornerRadius = buttonCornerRadius
+    }
+
+    public static let `default` = BubblNotificationModalStyle()
 }
 
 public struct BubblBootResult: Sendable, Codable, Equatable {
@@ -400,14 +480,14 @@ public struct BubblFlushResult: Sendable, Codable, Equatable {
 }
 
 public struct BubblDiagnostics: Sendable, Codable, Equatable {
-    public var sdkVersion = "3.1.7"
+    public var sdkVersion = "4.0.0"
     public var platform = "ios"
     public var booted = false
     public var pendingIngestCount = 0
     public var pushTokenSuffix: String?
 
     public init(
-        sdkVersion: String = "3.1.7",
+        sdkVersion: String = "4.0.0",
         platform: String = "ios",
         booted: Bool = false,
         pendingIngestCount: Int = 0,

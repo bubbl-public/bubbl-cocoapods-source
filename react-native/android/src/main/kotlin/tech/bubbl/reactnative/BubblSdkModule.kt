@@ -35,6 +35,8 @@ import tech.bubbl.sdk.BubblLogLevel
 import tech.bubbl.sdk.BubblNotificationCta
 import tech.bubbl.sdk.BubblNotificationDisplayResult
 import tech.bubbl.sdk.BubblNotificationMedia
+import tech.bubbl.sdk.BubblNotificationModalStyle
+import tech.bubbl.sdk.BubblNotificationModalTheme
 import tech.bubbl.sdk.BubblNotificationPayload
 import tech.bubbl.sdk.BubblNotificationRenderingMode
 import tech.bubbl.sdk.BubblNotificationSource
@@ -173,6 +175,12 @@ class BubblSdkModule(
     }
 
     @ReactMethod
+    fun setDefaultNotificationModalStyle(style: ReadableMap?, promise: Promise) = resolve(promise) {
+        BubblSdk.setDefaultNotificationModalStyle(style?.toNotificationModalStyle())
+        null
+    }
+
+    @ReactMethod
     fun registerPushToken(token: String, promise: Promise) = resolve(promise) {
         BubblSdk.registerPushToken(token)
         null
@@ -288,10 +296,38 @@ class BubblSdkModule(
                 }
             },
             enableDefaultNotificationModal = bool("enableDefaultNotificationModal", true),
+            defaultNotificationModalStyle = map("defaultNotificationModalStyle")?.toNotificationModalStyle(),
             enableDefaultSurveyUi = bool("enableDefaultSurveyUi", true),
             logLevel = enumValue(string("logLevel"), BubblLogLevel.Warn) {
                 BubblLogLevel.valueOf(it.replaceFirstChar(Char::uppercaseChar))
             }
+        )
+
+    private fun ReadableMap.toNotificationModalStyle(): BubblNotificationModalStyle =
+        BubblNotificationModalStyle(
+            theme = enumValue(string("theme"), BubblNotificationModalTheme.Light) {
+                if (it == "dark") BubblNotificationModalTheme.Dark else BubblNotificationModalTheme.Light
+            },
+            transparentBackdrop = bool("transparentBackdrop", true),
+            backdropColor = string("backdropColor"),
+            cardBackgroundColor = string("cardBackgroundColor"),
+            cardBorderColor = string("cardBorderColor"),
+            titleColor = string("titleColor"),
+            bodyColor = string("bodyColor"),
+            accentColor = string("accentColor"),
+            iconBackgroundColor = string("iconBackgroundColor"),
+            iconTextColor = string("iconTextColor"),
+            primaryButtonBackgroundColor = string("primaryButtonBackgroundColor"),
+            primaryButtonTextColor = string("primaryButtonTextColor"),
+            secondaryButtonBackgroundColor = string("secondaryButtonBackgroundColor"),
+            secondaryButtonTextColor = string("secondaryButtonTextColor"),
+            textButtonColor = string("textButtonColor"),
+            surveyBackgroundColor = string("surveyBackgroundColor"),
+            inputBackgroundColor = string("inputBackgroundColor"),
+            inputTextColor = string("inputTextColor"),
+            inputBorderColor = string("inputBorderColor"),
+            cornerRadius = nullableDouble("cornerRadius"),
+            buttonCornerRadius = nullableDouble("buttonCornerRadius")
         )
 
     private fun ReadableMap.toTrackEvent(): BubblTrackEvent =

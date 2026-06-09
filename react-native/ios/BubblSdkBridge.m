@@ -39,6 +39,9 @@ RCT_EXTERN_METHOD(clearCorrelationId:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(setDefaultNotificationModalEnabled:(BOOL)enabled
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(setDefaultNotificationModalStyle:(NSDictionary *)style
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(registerPushToken:(NSString *)token
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)

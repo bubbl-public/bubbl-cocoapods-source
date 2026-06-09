@@ -167,6 +167,7 @@ internal fun BubblConfig.toJson(): JSONObject = JSONObject()
     .put("enableLocationTracking", enableLocationTracking)
     .put("notificationRenderingMode", notificationRenderingMode.name)
     .put("enableDefaultNotificationModal", enableDefaultNotificationModal)
+    .put("defaultNotificationModalStyle", defaultNotificationModalStyle?.toJson() ?: JSONObject.NULL)
     .put("enableDefaultSurveyUi", enableDefaultSurveyUi)
     .put("logLevel", logLevel.name)
 
@@ -186,15 +187,69 @@ internal fun bubblConfigFromJson(json: JSONObject): BubblConfig = BubblConfig(
         json.optString("notificationRenderingMode", BubblNotificationRenderingMode.SdkDefault.name)
     ),
     enableDefaultNotificationModal = json.optBoolean("enableDefaultNotificationModal", true),
+    defaultNotificationModalStyle = json.optJSONObject("defaultNotificationModalStyle")?.let { bubblNotificationModalStyleFromJson(it) },
     enableDefaultSurveyUi = json.optBoolean("enableDefaultSurveyUi", true),
     logLevel = enumValueOf(json.optString("logLevel", BubblLogLevel.Warn.name))
 )
+
+internal fun BubblNotificationModalStyle.toJson(): JSONObject = JSONObject()
+    .put("theme", theme.name)
+    .put("transparentBackdrop", transparentBackdrop)
+    .put("backdropColor", backdropColor ?: JSONObject.NULL)
+    .put("cardBackgroundColor", cardBackgroundColor ?: JSONObject.NULL)
+    .put("cardBorderColor", cardBorderColor ?: JSONObject.NULL)
+    .put("titleColor", titleColor ?: JSONObject.NULL)
+    .put("bodyColor", bodyColor ?: JSONObject.NULL)
+    .put("accentColor", accentColor ?: JSONObject.NULL)
+    .put("iconBackgroundColor", iconBackgroundColor ?: JSONObject.NULL)
+    .put("iconTextColor", iconTextColor ?: JSONObject.NULL)
+    .put("primaryButtonBackgroundColor", primaryButtonBackgroundColor ?: JSONObject.NULL)
+    .put("primaryButtonTextColor", primaryButtonTextColor ?: JSONObject.NULL)
+    .put("secondaryButtonBackgroundColor", secondaryButtonBackgroundColor ?: JSONObject.NULL)
+    .put("secondaryButtonTextColor", secondaryButtonTextColor ?: JSONObject.NULL)
+    .put("textButtonColor", textButtonColor ?: JSONObject.NULL)
+    .put("surveyBackgroundColor", surveyBackgroundColor ?: JSONObject.NULL)
+    .put("inputBackgroundColor", inputBackgroundColor ?: JSONObject.NULL)
+    .put("inputTextColor", inputTextColor ?: JSONObject.NULL)
+    .put("inputBorderColor", inputBorderColor ?: JSONObject.NULL)
+    .put("cornerRadius", cornerRadius ?: JSONObject.NULL)
+    .put("buttonCornerRadius", buttonCornerRadius ?: JSONObject.NULL)
+
+internal fun bubblNotificationModalStyleFromJson(json: JSONObject): BubblNotificationModalStyle =
+    BubblNotificationModalStyle(
+        theme = runCatching {
+            BubblNotificationModalTheme.valueOf(json.optString("theme", BubblNotificationModalTheme.Light.name))
+        }.getOrDefault(BubblNotificationModalTheme.Light),
+        transparentBackdrop = json.optBoolean("transparentBackdrop", true),
+        backdropColor = json.optNullableString("backdropColor"),
+        cardBackgroundColor = json.optNullableString("cardBackgroundColor"),
+        cardBorderColor = json.optNullableString("cardBorderColor"),
+        titleColor = json.optNullableString("titleColor"),
+        bodyColor = json.optNullableString("bodyColor"),
+        accentColor = json.optNullableString("accentColor"),
+        iconBackgroundColor = json.optNullableString("iconBackgroundColor"),
+        iconTextColor = json.optNullableString("iconTextColor"),
+        primaryButtonBackgroundColor = json.optNullableString("primaryButtonBackgroundColor"),
+        primaryButtonTextColor = json.optNullableString("primaryButtonTextColor"),
+        secondaryButtonBackgroundColor = json.optNullableString("secondaryButtonBackgroundColor"),
+        secondaryButtonTextColor = json.optNullableString("secondaryButtonTextColor"),
+        textButtonColor = json.optNullableString("textButtonColor"),
+        surveyBackgroundColor = json.optNullableString("surveyBackgroundColor"),
+        inputBackgroundColor = json.optNullableString("inputBackgroundColor"),
+        inputTextColor = json.optNullableString("inputTextColor"),
+        inputBorderColor = json.optNullableString("inputBorderColor"),
+        cornerRadius = json.optNullableDouble("cornerRadius"),
+        buttonCornerRadius = json.optNullableDouble("buttonCornerRadius")
+    )
 
 private fun bubblEnvironmentFromJson(value: String): BubblEnvironment =
     runCatching { BubblEnvironment.valueOf(value) }.getOrElse { BubblEnvironment.Staging }
 
 internal fun JSONObject.optNullableString(name: String): String? =
     if (!has(name) || isNull(name)) null else optString(name)
+
+internal fun JSONObject.optNullableDouble(name: String): Double? =
+    if (!has(name) || isNull(name)) null else optDouble(name)
 
 internal fun JSONArray.toStringList(): List<String> =
     List(length()) { index -> getString(index) }

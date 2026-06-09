@@ -14,6 +14,7 @@ data class BubblConfig(
     val enableLocationTracking: Boolean = false,
     val notificationRenderingMode: BubblNotificationRenderingMode = BubblNotificationRenderingMode.SdkDefault,
     val enableDefaultNotificationModal: Boolean = true,
+    val defaultNotificationModalStyle: BubblNotificationModalStyle? = null,
     val enableDefaultSurveyUi: Boolean = true,
     val logLevel: BubblLogLevel = BubblLogLevel.Warn
 )
@@ -23,6 +24,31 @@ enum class BubblLogLevel { Off, Error, Warn, Info, Debug }
 enum class BubblNotificationRenderingMode { SdkDefault, HostRendered, EventOnly }
 enum class BubblNotificationTapPresentation { Auto, DefaultModal, HostModal }
 enum class BubblNotificationSource { Firebase, Apns, Runtime, Geofence, Manual }
+enum class BubblNotificationModalTheme { Light, Dark }
+
+data class BubblNotificationModalStyle(
+    val theme: BubblNotificationModalTheme = BubblNotificationModalTheme.Light,
+    val transparentBackdrop: Boolean = true,
+    val backdropColor: String? = null,
+    val cardBackgroundColor: String? = null,
+    val cardBorderColor: String? = null,
+    val titleColor: String? = null,
+    val bodyColor: String? = null,
+    val accentColor: String? = null,
+    val iconBackgroundColor: String? = null,
+    val iconTextColor: String? = null,
+    val primaryButtonBackgroundColor: String? = null,
+    val primaryButtonTextColor: String? = null,
+    val secondaryButtonBackgroundColor: String? = null,
+    val secondaryButtonTextColor: String? = null,
+    val textButtonColor: String? = null,
+    val surveyBackgroundColor: String? = null,
+    val inputBackgroundColor: String? = null,
+    val inputTextColor: String? = null,
+    val inputBorderColor: String? = null,
+    val cornerRadius: Double? = null,
+    val buttonCornerRadius: Double? = null
+)
 
 data class BubblBootResult(
     val ready: Boolean,
@@ -158,7 +184,7 @@ data class BubblNotificationTap(
 data class BubblFlushResult(val pendingCount: Int)
 
 data class BubblDiagnostics(
-    val sdkVersion: String = "3.1.7",
+    val sdkVersion: String = "4.0.0",
     val platform: String = "android",
     val booted: Boolean = false,
     val pendingIngestCount: Int = 0,

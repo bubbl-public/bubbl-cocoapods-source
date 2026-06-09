@@ -105,10 +105,18 @@ public final class BubblFlutterSdkPlugin: NSObject, FlutterPlugin, FlutterStream
             try await sdk.refresh()
             return nil
         case "refreshGeofence":
-            try await sdk.refreshGeofence(call.argumentsMap().bubblLocation())
+            let location = try call.argumentsMap().bubblLocation()
+            try await sdk.refreshGeofence(location)
+            #if canImport(CoreLocation)
+            await locationMonitor.refreshBackgroundRegions(near: location)
+            #endif
             return nil
         case "handleLocationUpdate":
-            try await sdk.handleLocationUpdate(call.argumentsMap().bubblLocation())
+            let location = try call.argumentsMap().bubblLocation()
+            try await sdk.handleLocationUpdate(location)
+            #if canImport(CoreLocation)
+            await locationMonitor.refreshBackgroundRegions(near: location)
+            #endif
             return nil
         case "refreshPush":
             try await sdk.refreshPush()
@@ -128,6 +136,9 @@ public final class BubblFlutterSdkPlugin: NSObject, FlutterPlugin, FlutterStream
             return nil
         case "setDefaultNotificationModalEnabled":
             try await sdk.setDefaultNotificationModalEnabled(call.argumentsMap().bool("enabled", default: true))
+            return nil
+        case "setDefaultNotificationModalStyle":
+            try await sdk.setDefaultNotificationModalStyle(call.argumentsMap().map("style")?.notificationModalStyle())
             return nil
         case "registerPushToken":
             try await sdk.registerPushToken(call.argumentsMap().requiredString("token"))
@@ -171,6 +182,26 @@ public final class BubblFlutterSdkPlugin: NSObject, FlutterPlugin, FlutterStream
         default:
             throw BubblFlutterPluginError(code: "not_implemented", message: "Unknown Bubbl Flutter method: \(call.method)")
         }
+    }
+
+    public func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [AnyHashable: Any] = [:]
+    ) -> Bool {
+        let launchedForLocation = launchOptions[UIApplication.LaunchOptionsKey.location] != nil
+            || launchOptions[UIApplication.LaunchOptionsKey.location.rawValue] != nil
+
+        guard launchedForLocation else {
+            return false
+        }
+
+        #if canImport(CoreLocation)
+        Task { @MainActor in
+            await locationMonitor.resumeForBackgroundLocationLaunch()
+        }
+        #endif
+
+        return false
     }
 
     public func application(
@@ -274,8 +305,35 @@ private extension Dictionary where Key == String, Value == Any {
             enableLocationTracking: bool("enableLocationTracking", default: false),
             notificationRenderingMode: BubblNotificationRenderingMode(rawValue: string("notificationRenderingMode") ?? "sdkDefault") ?? .sdkDefault,
             enableDefaultNotificationModal: bool("enableDefaultNotificationModal", default: true),
+            defaultNotificationModalStyle: try map("defaultNotificationModalStyle")?.notificationModalStyle(),
             enableDefaultSurveyUi: bool("enableDefaultSurveyUi", default: true),
             logLevel: BubblLogLevel(rawValue: string("logLevel") ?? "warn") ?? .warn
+        )
+    }
+
+    func notificationModalStyle() throws -> BubblNotificationModalStyle {
+        BubblNotificationModalStyle(
+            theme: BubblNotificationModalTheme(rawValue: string("theme") ?? "light") ?? .light,
+            transparentBackdrop: bool("transparentBackdrop", default: true),
+            backdropColor: string("backdropColor"),
+            cardBackgroundColor: string("cardBackgroundColor"),
+            cardBorderColor: string("cardBorderColor"),
+            titleColor: string("titleColor"),
+            bodyColor: string("bodyColor"),
+            accentColor: string("accentColor"),
+            iconBackgroundColor: string("iconBackgroundColor"),
+            iconTextColor: string("iconTextColor"),
+            primaryButtonBackgroundColor: string("primaryButtonBackgroundColor"),
+            primaryButtonTextColor: string("primaryButtonTextColor"),
+            secondaryButtonBackgroundColor: string("secondaryButtonBackgroundColor"),
+            secondaryButtonTextColor: string("secondaryButtonTextColor"),
+            textButtonColor: string("textButtonColor"),
+            surveyBackgroundColor: string("surveyBackgroundColor"),
+            inputBackgroundColor: string("inputBackgroundColor"),
+            inputTextColor: string("inputTextColor"),
+            inputBorderColor: string("inputBorderColor"),
+            cornerRadius: optionalDouble("cornerRadius"),
+            buttonCornerRadius: optionalDouble("buttonCornerRadius")
         )
     }
 

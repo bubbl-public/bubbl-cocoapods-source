@@ -8,6 +8,7 @@ public final class BubblLocationMonitor: NSObject, @preconcurrency CLLocationMan
     private let sdk: BubblClient
     private let manager: CLLocationManager
     private var useSignificantChanges = true
+    private var isTracking = false
     private var monitoredCandidates: [String: BubblGeofenceRegionCandidate] = [:]
 
     public init(
@@ -32,6 +33,7 @@ public final class BubblLocationMonitor: NSObject, @preconcurrency CLLocationMan
 
     public func start(useSignificantChanges: Bool = true, allowsBackgroundUpdates: Bool = true) {
         self.useSignificantChanges = useSignificantChanges
+        self.isTracking = true
 
         #if os(iOS)
         manager.allowsBackgroundLocationUpdates = allowsBackgroundUpdates
@@ -43,9 +45,15 @@ public final class BubblLocationMonitor: NSObject, @preconcurrency CLLocationMan
         } else {
             manager.startUpdatingLocation()
         }
+
+        Task {
+            _ = try? await sdk.restoreForBackground()
+            await refreshBackgroundRegions()
+        }
     }
 
     public func stop() {
+        isTracking = false
         if useSignificantChanges {
             manager.stopMonitoringSignificantLocationChanges()
         } else {
@@ -92,6 +100,33 @@ public final class BubblLocationMonitor: NSObject, @preconcurrency CLLocationMan
         monitoredCandidates = [:]
     }
 
+    public func resumeForBackgroundLocationLaunch(
+        useSignificantChanges: Bool = true,
+        allowsBackgroundUpdates: Bool = true
+    ) async {
+        guard (try? await sdk.restoreForBackground()) == true else {
+            return
+        }
+
+        start(
+            useSignificantChanges: useSignificantChanges,
+            allowsBackgroundUpdates: allowsBackgroundUpdates
+        )
+        await refreshBackgroundRegions()
+
+        if let location = manager.location {
+            try? await handleRegionWake(
+                location: BubblLocation(
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude
+                )
+            )
+            return
+        }
+
+        manager.requestLocation()
+    }
+
     public func handleRegionWake(location: BubblLocation) async throws {
         try await sdk.handleLocationUpdate(location)
         await refreshBackgroundRegions(near: location)
@@ -123,6 +158,19 @@ public final class BubblLocationMonitor: NSObject, @preconcurrency CLLocationMan
 
     public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // Host apps can observe SDK errors from the event stream; CoreLocation callbacks should not throw.
+    }
+
+    public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard isTracking else { return }
+
+        switch manager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            Task {
+                await refreshBackgroundRegions()
+            }
+        default:
+            break
+        }
     }
 
     private func applyBackgroundRegions(_ candidates: [BubblGeofenceRegionCandidate]) {
@@ -178,11 +226,7 @@ public final class BubblLocationMonitor: NSObject, @preconcurrency CLLocationMan
             return
         }
 
-        if let location = manager.location {
-            let bubblLocation = BubblLocation(
-                latitude: location.coordinate.latitude,
-                longitude: location.coordinate.longitude
-            )
+        if let bubblLocation = wakeLocation(for: region) {
             Task {
                 try? await handleRegionWake(location: bubblLocation)
             }
@@ -192,6 +236,19 @@ public final class BubblLocationMonitor: NSObject, @preconcurrency CLLocationMan
         manager.requestLocation()
     }
 
+    private func wakeLocation(for region: CLRegion) -> BubblLocation? {
+        if let location = manager.location,
+           abs(location.timestamp.timeIntervalSinceNow) <= Self.maximumLocationAgeSeconds {
+            return BubblLocation(
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude
+            )
+        }
+
+        return monitoredCandidates[region.identifier]?.center
+    }
+
     private static let regionIdentifierPrefix = "tech.bubbl.sdk.geofence."
+    private static let maximumLocationAgeSeconds: TimeInterval = 120
 }
 #endif

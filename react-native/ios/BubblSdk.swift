@@ -1,6 +1,7 @@
 import Foundation
 import React
 import BubblSDK
+import UIKit
 
 #if canImport(CoreLocation)
 import CoreLocation
@@ -114,7 +115,11 @@ final class BubblSdk: RCTEventEmitter {
         reject: @escaping RCTPromiseRejectBlock
     ) {
         resolveAsync(resolve, reject) {
-            try await self.sdk.refreshGeofence(BubblLocation(latitude: latitude, longitude: longitude))
+            let location = BubblLocation(latitude: latitude, longitude: longitude)
+            try await self.sdk.refreshGeofence(location)
+            #if canImport(CoreLocation)
+            await self.locationMonitor.refreshBackgroundRegions(near: location)
+            #endif
             return nil
         }
     }
@@ -127,7 +132,11 @@ final class BubblSdk: RCTEventEmitter {
         reject: @escaping RCTPromiseRejectBlock
     ) {
         resolveAsync(resolve, reject) {
-            try await self.sdk.handleLocationUpdate(BubblLocation(latitude: latitude, longitude: longitude))
+            let location = BubblLocation(latitude: latitude, longitude: longitude)
+            try await self.sdk.handleLocationUpdate(location)
+            #if canImport(CoreLocation)
+            await self.locationMonitor.refreshBackgroundRegions(near: location)
+            #endif
             return nil
         }
     }
@@ -206,6 +215,18 @@ final class BubblSdk: RCTEventEmitter {
     ) {
         resolveAsync(resolve, reject) {
             try await self.sdk.setDefaultNotificationModalEnabled(enabled)
+            return nil
+        }
+    }
+
+    @objc(setDefaultNotificationModalStyle:resolver:rejecter:)
+    func setDefaultNotificationModalStyle(
+        _ style: NSDictionary?,
+        resolve: @escaping RCTPromiseResolveBlock,
+        reject: @escaping RCTPromiseRejectBlock
+    ) {
+        resolveAsync(resolve, reject) {
+            try await self.sdk.setDefaultNotificationModalStyle(try style?.swiftMap.notificationModalStyle())
             return nil
         }
     }
@@ -382,6 +403,31 @@ final class BubblSdk: RCTEventEmitter {
     private static let eventName = "BubblSdkEvent"
 }
 
+@objc(BubblSdkLocationLaunchHandler)
+public final class BubblSdkLocationLaunchHandler: NSObject {
+    #if canImport(CoreLocation)
+    @MainActor private static let locationMonitor = BubblLocationMonitor(sdk: .shared)
+    #endif
+
+    @objc(handleLaunchOptions:)
+    public static func handleLaunchOptions(_ launchOptions: NSDictionary?) -> Bool {
+        let launchedForLocation = launchOptions?[UIApplication.LaunchOptionsKey.location.rawValue] != nil
+            || launchOptions?[UIApplication.LaunchOptionsKey.location] != nil
+
+        guard launchedForLocation else {
+            return false
+        }
+
+        #if canImport(CoreLocation)
+        Task { @MainActor in
+            await locationMonitor.resumeForBackgroundLocationLaunch()
+        }
+        #endif
+
+        return true
+    }
+}
+
 private struct BubblReactNativeError: Error {
     let code: String
     let message: String
@@ -457,8 +503,35 @@ private extension Dictionary where Key == String, Value == Any {
             enableLocationTracking: bool("enableLocationTracking", default: false),
             notificationRenderingMode: BubblNotificationRenderingMode(rawValue: string("notificationRenderingMode") ?? "sdkDefault") ?? .sdkDefault,
             enableDefaultNotificationModal: bool("enableDefaultNotificationModal", default: true),
+            defaultNotificationModalStyle: try map("defaultNotificationModalStyle")?.notificationModalStyle(),
             enableDefaultSurveyUi: bool("enableDefaultSurveyUi", default: true),
             logLevel: BubblLogLevel(rawValue: string("logLevel") ?? "warn") ?? .warn
+        )
+    }
+
+    func notificationModalStyle() throws -> BubblNotificationModalStyle {
+        BubblNotificationModalStyle(
+            theme: BubblNotificationModalTheme(rawValue: string("theme") ?? "light") ?? .light,
+            transparentBackdrop: bool("transparentBackdrop", default: true),
+            backdropColor: string("backdropColor"),
+            cardBackgroundColor: string("cardBackgroundColor"),
+            cardBorderColor: string("cardBorderColor"),
+            titleColor: string("titleColor"),
+            bodyColor: string("bodyColor"),
+            accentColor: string("accentColor"),
+            iconBackgroundColor: string("iconBackgroundColor"),
+            iconTextColor: string("iconTextColor"),
+            primaryButtonBackgroundColor: string("primaryButtonBackgroundColor"),
+            primaryButtonTextColor: string("primaryButtonTextColor"),
+            secondaryButtonBackgroundColor: string("secondaryButtonBackgroundColor"),
+            secondaryButtonTextColor: string("secondaryButtonTextColor"),
+            textButtonColor: string("textButtonColor"),
+            surveyBackgroundColor: string("surveyBackgroundColor"),
+            inputBackgroundColor: string("inputBackgroundColor"),
+            inputTextColor: string("inputTextColor"),
+            inputBorderColor: string("inputBorderColor"),
+            cornerRadius: optionalDouble("cornerRadius"),
+            buttonCornerRadius: optionalDouble("buttonCornerRadius")
         )
     }
 

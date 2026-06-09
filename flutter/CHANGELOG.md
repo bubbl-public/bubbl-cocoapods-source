@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.0.0
+
+- Primes iOS native background region monitoring when location tracking starts and after geofence/location refresh calls, so background geofence notifications can fire without relying on foreground Dart UI execution.
+- Handles iOS `UIApplication.LaunchOptionsKey.location` launches by restoring persisted SDK state and resuming native geofence monitoring before the Flutter UI mounts.
+- Registers the Flutter iOS plugin as an application delegate, requests APNs registration when push handling is enabled, and forwards APNs token/remote-notification callbacks into the native SDK.
+- Aligns the Flutter wrapper with the native SDK 4.0.0 release.
+
 ## 3.1.7
 
 - Aligns the Flutter wrapper with the native SDK 3.1.7 release.
