@@ -6,7 +6,21 @@ ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
 if [ -n "${BUBBL_COCOAPODS_SOURCE_URL:-}" ]; then
+  FINAL_SOURCE_URL="$BUBBL_COCOAPODS_SOURCE_URL"
+  FINAL_SOURCE_TAG="${BUBBL_COCOAPODS_SOURCE_TAG:-}"
+  LINT_SOURCE_URL="${BUBBL_COCOAPODS_LINT_SOURCE_URL:-file://$ROOT_DIR}"
+  LINT_SOURCE_TAG="${BUBBL_COCOAPODS_LINT_SOURCE_TAG:-$(git rev-parse HEAD)}"
+
+  export BUBBL_COCOAPODS_SOURCE_URL="$LINT_SOURCE_URL"
+  export BUBBL_COCOAPODS_SOURCE_TAG="$LINT_SOURCE_TAG"
   node scripts/prepare-cocoapods-specs.mjs
+
+  echo "Linting CocoaPods specs against checked-out source: $LINT_SOURCE_URL"
+  echo "Linting CocoaPods specs against source tag/commit: $LINT_SOURCE_TAG"
+  echo "Final CocoaPods source URL remains: $FINAL_SOURCE_URL"
+  if [ -n "$FINAL_SOURCE_TAG" ]; then
+    echo "Final CocoaPods source tag remains: $FINAL_SOURCE_TAG"
+  fi
 
   pod spec lint build/cocoapods/BubblSDK.podspec --allow-warnings --verbose
 

@@ -1,6 +1,6 @@
 name: bubbl_flutter_sdk
 description: Flutter wrapper for Bubbl SDK v3 native Android and iOS cores.
-version: 4.0.0
+version: 4.0.1
 homepage: https://bubbl.tech
 repository: https://github.com/bubbl-platform/renewed-sdk
 

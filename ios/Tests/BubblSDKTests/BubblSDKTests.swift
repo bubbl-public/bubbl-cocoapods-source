@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.0.0")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.0.1")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -333,6 +333,35 @@ final class BubblSDKTests: XCTestCase {
             BubblNotificationAttachmentPlanner.youtubeEmbedURL(for: media)?.absoluteString,
             "https://www.youtube.com/embed/dQw4w9WgXcQ?playsinline=1&rel=0&origin=https%3A%2F%2Fbubbl.tech"
         )
+    }
+
+    func testDefaultNotificationModalMediaHTMLRendersMediaInline() throws {
+        let imageHTML = BubblNotificationAttachmentPlanner.inlineMediaHTML(
+            for: BubblNotificationMedia(
+                url: try XCTUnwrap(URL(string: "https://cdn.test/offer.png")),
+                type: "image/png",
+                altText: "Offer"
+            )
+        )
+        let audioHTML = BubblNotificationAttachmentPlanner.inlineMediaHTML(
+            for: BubblNotificationMedia(
+                url: try XCTUnwrap(URL(string: "https://cdn.test/audio.mp3")),
+                type: "audio/mpeg"
+            )
+        )
+        let videoHTML = BubblNotificationAttachmentPlanner.inlineMediaHTML(
+            for: BubblNotificationMedia(
+                url: try XCTUnwrap(URL(string: "https://cdn.test/video.mp4")),
+                type: "video/mp4"
+            )
+        )
+
+        XCTAssertTrue(imageHTML.contains(#"<img src="https://cdn.test/offer.png""#))
+        XCTAssertTrue(audioHTML.contains(#"<audio src="https://cdn.test/audio.mp3" controls"#))
+        XCTAssertTrue(videoHTML.contains(#"<video src="https://cdn.test/video.mp4" controls"#))
+        XCTAssertFalse(imageHTML.contains("UIApplication.shared.open"))
+        XCTAssertFalse(audioHTML.contains("UIApplication.shared.open"))
+        XCTAssertFalse(videoHTML.contains("UIApplication.shared.open"))
     }
 
     func testNotificationAttachmentPlannerRejectsUnsupportedOrLocalMedia() throws {

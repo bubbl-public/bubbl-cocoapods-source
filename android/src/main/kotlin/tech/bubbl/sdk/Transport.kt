@@ -60,7 +60,7 @@ class UrlConnectionBubblHttpTransport : BubblHttpTransport {
 }
 
 internal object BubblTransportMap {
-    const val sdkVersion = "4.0.0"
+    const val sdkVersion = "4.0.1"
     const val platform = "android"
 
     const val runtimeAuthHeader = "x-api-key"

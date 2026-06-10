@@ -149,12 +149,70 @@ public enum BubblNotificationAttachmentPlanner {
         """
     }
 
+    public static func inlineMediaHTML(for media: BubblNotificationMedia) -> String {
+        let url = escapeHTML(media.url.absoluteString)
+        let alt = escapeHTML(media.altText ?? "Notification media")
+        let body: String
+
+        if isImageMedia(media) {
+            body = #"<img src="\#(url)" alt="\#(alt)" />"#
+        } else if isAudioMedia(media) {
+            body = #"<audio src="\#(url)" controls preload="metadata"></audio>"#
+        } else {
+            body = #"<video src="\#(url)" controls playsinline preload="metadata"></video>"#
+        }
+
+        return """
+        <!doctype html>
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+              body { display: flex; align-items: center; justify-content: center; }
+              img, video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+              audio { width: calc(100% - 24px); }
+            </style>
+          </head>
+          <body>
+            \(body)
+          </body>
+        </html>
+        """
+    }
+
     public static func youtubeThumbnailURL(for media: BubblNotificationMedia) -> URL? {
         guard let id = youtubeVideoID(from: media.url) else {
             return nil
         }
 
         return URL(string: "https://img.youtube.com/vi/\(id)/hqdefault.jpg")
+    }
+
+    public static func isAudioMedia(_ media: BubblNotificationMedia) -> Bool {
+        if let type = media.type?.lowercased() {
+            return type == "audio" || type.hasPrefix("audio/")
+        }
+
+        let path = media.url.path.lowercased()
+        return path.hasSuffix(".mp3")
+            || path.hasSuffix(".m4a")
+            || path.hasSuffix(".aac")
+            || path.hasSuffix(".wav")
+            || path.hasSuffix(".ogg")
+    }
+
+    public static func isImageMedia(_ media: BubblNotificationMedia) -> Bool {
+        if let type = media.type?.lowercased() {
+            return type == "image" || type.hasPrefix("image/")
+        }
+
+        let path = media.url.path.lowercased()
+        return path.hasSuffix(".png")
+            || path.hasSuffix(".jpg")
+            || path.hasSuffix(".jpeg")
+            || path.hasSuffix(".webp")
+            || path.hasSuffix(".gif")
     }
 
     private static func youtubeVideoID(from url: URL) -> String? {
@@ -202,6 +260,15 @@ public enum BubblNotificationAttachmentPlanner {
         }
 
         return value
+    }
+
+    private static func escapeHTML(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 }
 
@@ -511,27 +578,11 @@ public final class BubblNotificationViewController: UIViewController {
         }
 
         if let media = payload.media {
+            trackMediaViewed()
             if let embedURL = BubblNotificationAttachmentPlanner.youtubeEmbedURL(for: media) {
                 stack.addArrangedSubview(youtubeMediaView(embedURL: embedURL))
-                let button = secondaryButton(media.altText ?? "Open video") { [weak self] in
-                    guard let self else { return }
-                    Task {
-                        try? await self.sdk.handleNotificationMediaViewed(self.payload)
-                        _ = await self.sdk.flush()
-                    }
-                    UIApplication.shared.open(media.url)
-                }
-                stack.addArrangedSubview(button)
             } else {
-                let button = secondaryButton(media.altText ?? "View media") { [weak self] in
-                    guard let self else { return }
-                    Task {
-                        try? await self.sdk.handleNotificationMediaViewed(self.payload)
-                        _ = await self.sdk.flush()
-                    }
-                    UIApplication.shared.open(media.url)
-                }
-                stack.addArrangedSubview(button)
+                stack.addArrangedSubview(inlineMediaView(media: media))
             }
         }
 
@@ -703,6 +754,33 @@ public final class BubblNotificationViewController: UIViewController {
             baseURL: URL(string: "https://bubbl.tech")
         )
         return webView
+    }
+
+    private func inlineMediaView(media: BubblNotificationMedia) -> UIView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        if #available(iOS 10.0, *) {
+            configuration.mediaTypesRequiringUserActionForPlayback = []
+        }
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.backgroundColor = .black
+        webView.scrollView.isScrollEnabled = false
+        webView.layer.cornerRadius = 16
+        webView.clipsToBounds = true
+        webView.heightAnchor.constraint(equalToConstant: BubblNotificationAttachmentPlanner.isAudioMedia(media) ? 88 : 210).isActive = true
+        webView.loadHTMLString(
+            BubblNotificationAttachmentPlanner.inlineMediaHTML(for: media),
+            baseURL: URL(string: "https://bubbl.tech")
+        )
+        return webView
+    }
+
+    private func trackMediaViewed() {
+        Task {
+            try? await sdk.handleNotificationMediaViewed(payload)
+            _ = await sdk.flush()
+        }
     }
 
     private func makeChoiceButton(_ title: String) -> UIButton {

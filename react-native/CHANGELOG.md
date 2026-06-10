@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.1
+
+- Android and iOS default notification modals now render image, audio, and video media inline instead of showing an external media button.
+- YouTube notification media remains embedded in-app inside the default modal.
+- Aligns the React Native wrapper with the native SDK 4.0.1 release.
+
 ## 4.0.0
 
 - Primes iOS native background region monitoring when location tracking starts and after geofence/location refresh calls, so background geofence notifications can fire without relying on foreground JavaScript execution.

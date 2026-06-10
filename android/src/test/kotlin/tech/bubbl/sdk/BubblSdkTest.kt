@@ -51,7 +51,7 @@ class BubblSdkTest {
         assertEquals("/api/device-data", URI(requests.single().url).path)
         assertEquals("POST", requests.single().method)
         assertEquals("sdk-key", requests.single().headers["ApiKey"])
-        assertEquals("4.0.0", requests.single().headers["X-Bubbl-SDK-Version"])
+        assertEquals("4.0.1", requests.single().headers["X-Bubbl-SDK-Version"])
         assertEquals("android", requests.single().headers["X-Bubbl-SDK-Platform"])
         assertNotNull(requests.single().headers["Idempotency-Key"])
         assertNotNull(requests.single().headers["X-Bubbl-Install-ID"])
@@ -860,6 +860,26 @@ class BubblSdkTest {
 
         assertEquals(false, plan.shouldUseBigPicture)
         assertNull(plan.ctaAction)
+    }
+
+    @Test
+    fun defaultNotificationModalMediaHtmlRendersMediaInline() {
+        val imageHtml = BubblMediaUrls.inlineMediaHtml(
+            BubblNotificationMedia(url = "https://cdn.test/offer.png", type = "image/png", altText = "Offer")
+        )
+        val audioHtml = BubblMediaUrls.inlineMediaHtml(
+            BubblNotificationMedia(url = "https://cdn.test/audio.mp3", type = "audio/mpeg")
+        )
+        val videoHtml = BubblMediaUrls.inlineMediaHtml(
+            BubblNotificationMedia(url = "https://cdn.test/video.mp4", type = "video/mp4")
+        )
+
+        assertTrue(imageHtml.contains("<img src=\"https://cdn.test/offer.png\""))
+        assertTrue(audioHtml.contains("<audio src=\"https://cdn.test/audio.mp3\" controls"))
+        assertTrue(videoHtml.contains("<video src=\"https://cdn.test/video.mp4\" controls"))
+        assertFalse(imageHtml.contains("window.open"))
+        assertFalse(audioHtml.contains("window.open"))
+        assertFalse(videoHtml.contains("window.open"))
     }
 
     @Test

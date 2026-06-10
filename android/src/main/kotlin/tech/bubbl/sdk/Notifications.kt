@@ -245,56 +245,32 @@ public class BubblNotificationActivity : Activity() {
         }
 
         payload.media?.let { media ->
+            trackMediaViewed(payload)
             val youtubeEmbedUrl = BubblMediaUrls.youtubeEmbedUrl(media.url)
+            val mediaHtml = youtubeEmbedUrl
+                ?.let(BubblMediaUrls::youtubeEmbedHtml)
+                ?: BubblMediaUrls.inlineMediaHtml(media)
 
-            if (youtubeEmbedUrl != null) {
-                card.addView(WebView(this).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.mediaPlaybackRequiresUserGesture = false
-                    webChromeClient = WebChromeClient()
-                    background = roundedBackground(Color.BLACK, dp(16))
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        dp(190)
-                    ).apply {
-                        topMargin = dp(18)
-                    }
-                    loadDataWithBaseURL(
-                        "https://bubbl.tech",
-                        BubblMediaUrls.youtubeEmbedHtml(youtubeEmbedUrl),
-                        "text/html",
-                        "UTF-8",
-                        null
-                    )
-                })
-
-                card.addView(Button(this).apply {
-                    text = media.altText ?: "Open video"
-                    styleSecondaryButton(dp(48), dp(palette.buttonCornerRadiusDp), dp(1), palette)
-                    layoutParams = fullWidthLayout(top = dp(10))
-                    setOnClickListener {
-                        scope.launch {
-                            BubblSdk.handleNotificationMediaViewed(payload)
-                            BubblSdk.flush()
-                        }
-                        openUrl(media.url)
-                    }
-                })
-            } else {
-                card.addView(Button(this).apply {
-                    text = media.altText ?: "View media"
-                    styleSecondaryButton(dp(48), dp(palette.buttonCornerRadiusDp), dp(1), palette)
-                    layoutParams = fullWidthLayout(top = dp(18))
-                    setOnClickListener {
-                        scope.launch {
-                            BubblSdk.handleNotificationMediaViewed(payload)
-                            BubblSdk.flush()
-                        }
-                        openUrl(media.url)
-                    }
-                })
-            }
+            card.addView(WebView(this).apply {
+                settings.javaScriptEnabled = true
+                settings.domStorageEnabled = true
+                settings.mediaPlaybackRequiresUserGesture = false
+                webChromeClient = WebChromeClient()
+                background = roundedBackground(Color.BLACK, dp(16))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    if (BubblMediaUrls.isAudioMedia(media)) dp(88) else dp(190)
+                ).apply {
+                    topMargin = dp(18)
+                }
+                loadDataWithBaseURL(
+                    "https://bubbl.tech",
+                    mediaHtml,
+                    "text/html",
+                    "UTF-8",
+                    null
+                )
+            })
         }
 
         payload.cta?.let { cta ->
@@ -491,6 +467,13 @@ public class BubblNotificationActivity : Activity() {
         isAllCaps = false
         setTextColor(palette.primaryButtonTextColor)
         background = roundedBackground(palette.primaryButtonBackgroundColor, cornerRadius)
+    }
+
+    private fun trackMediaViewed(payload: BubblNotificationPayload) {
+        scope.launch {
+            BubblSdk.handleNotificationMediaViewed(payload)
+            BubblSdk.flush()
+        }
     }
 
     private fun Button.styleSecondaryButton(
@@ -1104,10 +1087,55 @@ internal object BubblMediaUrls {
         </html>
         """.trimIndent()
 
+    fun inlineMediaHtml(media: BubblNotificationMedia): String {
+        val escapedUrl = escapeHtml(media.url)
+        val escapedAlt = escapeHtml(media.altText ?: "Notification media")
+        val body = when {
+            isImageMedia(media) ->
+                """<img src="$escapedUrl" alt="$escapedAlt" />"""
+            isAudioMedia(media) ->
+                """<audio src="$escapedUrl" controls preload="metadata"></audio>"""
+            else ->
+                """<video src="$escapedUrl" controls playsinline preload="metadata" poster="${escapeHtml(youtubeThumbnailUrl(media.url).orEmpty())}"></video>"""
+        }
+
+        return """
+        <!doctype html>
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+              body { display: flex; align-items: center; justify-content: center; }
+              img, video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+              audio { width: calc(100% - 24px); }
+            </style>
+          </head>
+          <body>
+            $body
+          </body>
+        </html>
+        """.trimIndent()
+    }
+
     fun notificationImageUrl(media: BubblNotificationMedia): String? =
         youtubeThumbnailUrl(media.url) ?: media.url.takeIf { isImageMedia(media) }
 
-    private fun isImageMedia(media: BubblNotificationMedia): Boolean {
+    fun isAudioMedia(media: BubblNotificationMedia): Boolean {
+        val type = media.type?.lowercase(Locale.US)
+        if (type != null) {
+            return type == "audio" || type.startsWith("audio/")
+        }
+
+        val path = runCatching { Uri.parse(media.url).path.orEmpty().lowercase(Locale.US) }.getOrDefault("")
+        return path.endsWith(".mp3") ||
+            path.endsWith(".m4a") ||
+            path.endsWith(".aac") ||
+            path.endsWith(".wav") ||
+            path.endsWith(".ogg")
+    }
+
+    fun isImageMedia(media: BubblNotificationMedia): Boolean {
         val type = media.type?.lowercase(Locale.US)
         if (type != null) {
             return type == "image" || type.startsWith("image/")
@@ -1120,6 +1148,14 @@ internal object BubblMediaUrls {
             path.endsWith(".webp") ||
             path.endsWith(".gif")
     }
+
+    private fun escapeHtml(value: String): String =
+        value
+            .replace("&", "&amp;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
 
     private fun validYoutubeId(id: String?): String? {
         val value = id?.trim().orEmpty()
