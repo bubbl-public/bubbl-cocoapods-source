@@ -156,6 +156,17 @@ public final actor BubblClient {
         try saveConfig(nextConfig)
     }
 
+    public func setDefaultNotificationModalStyle(_ style: BubblNotificationModalStyle?) async throws {
+        var nextConfig = try requireConfig()
+        nextConfig.defaultNotificationModalStyle = style
+        config = nextConfig
+        try saveConfig(nextConfig)
+    }
+
+    public func defaultNotificationModalStyle() async -> BubblNotificationModalStyle {
+        config?.defaultNotificationModalStyle ?? .default
+    }
+
     public func registerPushToken(_ token: String) async throws {
         try restoreRuntimeStateIfNeeded()
         let activeConfig = try requireConfig()
@@ -168,10 +179,12 @@ public final actor BubblClient {
 
     public func updateAPNsToken(_ token: Data) async throws {
         try await registerPushToken(token.map { String(format: "%02.2hhx", $0) }.joined())
+        _ = await flush()
     }
 
     public func updateFCMToken(_ token: String) async throws {
         try await registerPushToken(token)
+        _ = await flush()
     }
 
     public func handleRemoteNotification(_ userInfo: [AnyHashable: Any]) async throws -> BubblNotificationPayload? {

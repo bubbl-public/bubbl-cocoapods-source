@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "3.1.5")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.0.2")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -89,6 +89,32 @@ final class BubblSDKTests: XCTestCase {
         diagnostics = await sdk.diagnostics()
         XCTAssertEqual(diagnostics.pendingIngestCount, 0)
         XCTAssertEqual(transport.requests.count, 1)
+    }
+
+    func testUpdateFCMTokenFlushesDeviceRegistrationImmediately() async throws {
+        let transport = MockTransport { request in
+            BubblHTTPResponse(statusCode: 200, data: #"{"success":true,"queued":true,"data":{"ingest_message_id":"1","status":"queued"}}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+
+        _ = try await sdk.boot(
+            BubblConfig(
+                apiKey: "sdk-key",
+                runtimeBaseUrl: URL(string: "https://runtime.test")!,
+                ingestBaseUrl: URL(string: "https://ingest.test")!,
+                segments: ["vip"]
+            )
+        )
+
+        try await sdk.updateFCMToken("real-fcm-token")
+
+        let diagnostics = await sdk.diagnostics()
+        XCTAssertEqual(diagnostics.pendingIngestCount, 0)
+        XCTAssertEqual(transport.requests.map(\.url.path), ["/api/device-data", "/api/device-registerd/create"])
+
+        let body = try XCTUnwrap(transport.requests.last?.body)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(json["device_token"] as? String, "real-fcm-token")
     }
 
     func testRuntimeConfigurationFallsBackToCachedResponse() async throws {
@@ -314,6 +340,54 @@ final class BubblSDKTests: XCTestCase {
             BubblNotificationAttachmentPlanner.fileName(notificationId: "offer/42", fileExtension: "png"),
             "offer_42.png"
         )
+    }
+
+    func testNotificationAttachmentPlannerUsesYoutubeThumbnailForYoutubeMedia() throws {
+        let media = BubblNotificationMedia(
+            url: try XCTUnwrap(URL(string: "https://youtu.be/dQw4w9WgXcQ")),
+            type: "youtube",
+            altText: "Watch video"
+        )
+
+        XCTAssertTrue(BubblNotificationAttachmentPlanner.isEligible(media))
+        XCTAssertEqual(BubblNotificationAttachmentPlanner.fileExtension(for: media), "jpg")
+        XCTAssertEqual(
+            BubblNotificationAttachmentPlanner.attachmentURL(for: media)?.absoluteString,
+            "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+        )
+        XCTAssertEqual(
+            BubblNotificationAttachmentPlanner.youtubeEmbedURL(for: media)?.absoluteString,
+            "https://www.youtube.com/embed/dQw4w9WgXcQ?playsinline=1&rel=0&origin=https%3A%2F%2Fbubbl.tech"
+        )
+    }
+
+    func testDefaultNotificationModalMediaHTMLRendersMediaInline() throws {
+        let imageHTML = BubblNotificationAttachmentPlanner.inlineMediaHTML(
+            for: BubblNotificationMedia(
+                url: try XCTUnwrap(URL(string: "https://cdn.test/offer.png")),
+                type: "image/png",
+                altText: "Offer"
+            )
+        )
+        let audioHTML = BubblNotificationAttachmentPlanner.inlineMediaHTML(
+            for: BubblNotificationMedia(
+                url: try XCTUnwrap(URL(string: "https://cdn.test/audio.mp3")),
+                type: "audio/mpeg"
+            )
+        )
+        let videoHTML = BubblNotificationAttachmentPlanner.inlineMediaHTML(
+            for: BubblNotificationMedia(
+                url: try XCTUnwrap(URL(string: "https://cdn.test/video.mp4")),
+                type: "video/mp4"
+            )
+        )
+
+        XCTAssertTrue(imageHTML.contains(#"<img src="https://cdn.test/offer.png""#))
+        XCTAssertTrue(audioHTML.contains(#"<audio src="https://cdn.test/audio.mp3" controls"#))
+        XCTAssertTrue(videoHTML.contains(#"<video src="https://cdn.test/video.mp4" controls"#))
+        XCTAssertFalse(imageHTML.contains("UIApplication.shared.open"))
+        XCTAssertFalse(audioHTML.contains("UIApplication.shared.open"))
+        XCTAssertFalse(videoHTML.contains("UIApplication.shared.open"))
     }
 
     func testNotificationAttachmentPlannerRejectsUnsupportedOrLocalMedia() throws {
@@ -735,6 +809,51 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertTrue(reentered.notifications.isEmpty)
     }
 
+    func testGeofenceEngineGatesSameNotificationAcrossCampaignLocations() throws {
+        let response = geofenceRuntimeResponseWithTwoLocationsSameNotification()
+        let firstLocation = BubblLocation(latitude: 51.50158, longitude: -0.141)
+        let secondLocation = BubblLocation(latitude: 51.50358, longitude: -0.141)
+        let outside = BubblLocation(latitude: 51.500, longitude: -0.141)
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-05-05T10:00:00Z"))
+
+        let firstEntered = BubblGeofenceEngine.evaluate(
+            runtimeResponse: response,
+            location: firstLocation,
+            state: BubblGeofenceState(),
+            now: now
+        )
+        let exited = BubblGeofenceEngine.evaluate(
+            runtimeResponse: response,
+            location: outside,
+            state: firstEntered.nextState,
+            now: now.addingTimeInterval(30)
+        )
+        let secondEntered = BubblGeofenceEngine.evaluate(
+            runtimeResponse: response,
+            location: secondLocation,
+            state: exited.nextState,
+            now: now.addingTimeInterval(60)
+        )
+
+        XCTAssertEqual(firstEntered.notifications.single?.payload.title, "Welcome")
+        XCTAssertEqual(secondEntered.transitions.single?.type, .enter)
+        XCTAssertTrue(secondEntered.notifications.isEmpty)
+    }
+
+    func testGeofenceEngineAllowsDistinctNotificationsInSameCampaign() throws {
+        let entered = BubblGeofenceEngine.evaluate(
+            runtimeResponse: geofenceRuntimeResponseWithDistinctEnterNotifications(),
+            location: BubblLocation(latitude: 51.50158, longitude: -0.141),
+            state: BubblGeofenceState(),
+            now: try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-05-05T10:00:00Z"))
+        )
+
+        XCTAssertEqual(
+            entered.notifications.map(\.payload.title),
+            ["First welcome", "Second welcome"]
+        )
+    }
+
     func testRefreshGeofenceRoutesEnterTransitionThroughNotificationEngine() async throws {
         let presenter = MockNotificationPresenter()
         let transport = MockTransport { request in
@@ -1065,6 +1184,98 @@ final class BubblSDKTests: XCTestCase {
                 "privacyText":"Privacy",
                 "frequencyDefaults": \(configurationFrequencyDefaults)
               }
+            }
+        """.data(using: .utf8)!
+    }
+
+    private func geofenceRuntimeResponseWithTwoLocationsSameNotification() -> Data {
+        """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": 123,
+                  "campaignName": "Multi-location campaign",
+                  "type": "GEO",
+                  "active": "true",
+                  "locationsArray": [
+                    {
+                      "locationId": 10,
+                      "geofence": [
+                        { "position": 1, "latitude": "51.501476", "longitude": "-0.140112" },
+                        { "position": 2, "latitude": "51.501800", "longitude": "-0.141000" },
+                        { "position": 3, "latitude": "51.501476", "longitude": "-0.142000" }
+                      ]
+                    },
+                    {
+                      "locationId": 11,
+                      "geofence": [
+                        { "position": 1, "latitude": "51.503476", "longitude": "-0.140112" },
+                        { "position": 2, "latitude": "51.503800", "longitude": "-0.141000" },
+                        { "position": 3, "latitude": "51.503476", "longitude": "-0.142000" }
+                      ]
+                    }
+                  ],
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": 456,
+                      "headline": "Welcome",
+                      "body": "Thanks for visiting",
+                      "type": "notification",
+                      "activation": "ON_ENTER",
+                      "published": true,
+                      "coolingPeriodSeconds": 3600,
+                      "maximumTriggers": 1
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.data(using: .utf8)!
+    }
+
+    private func geofenceRuntimeResponseWithDistinctEnterNotifications() -> Data {
+        """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": 123,
+                  "campaignName": "Distinct notifications",
+                  "type": "GEO",
+                  "active": "true",
+                  "locationsArray": {
+                    "locationId": 10,
+                    "geofence": [
+                      { "position": 1, "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "position": 2, "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "position": 3, "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": 456,
+                      "headline": "First welcome",
+                      "body": "First",
+                      "type": "notification",
+                      "activation": "ON_ENTER",
+                      "published": true,
+                      "maximumTriggers": 1
+                    },
+                    {
+                      "curatedNotificationId": 457,
+                      "headline": "Second welcome",
+                      "body": "Second",
+                      "type": "notification",
+                      "activation": "ON_ENTER",
+                      "published": true,
+                      "maximumTriggers": 1
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
             }
         """.data(using: .utf8)!
     }

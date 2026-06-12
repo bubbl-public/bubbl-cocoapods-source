@@ -3,6 +3,7 @@ import UserNotifications
 
 #if os(iOS)
 import UIKit
+import WebKit
 #endif
 
 public protocol BubblNotificationPresenting {
@@ -26,6 +27,7 @@ public struct URLSessionBubblNotificationAttachmentLoader: BubblNotificationAtta
 
     public func attachment(for payload: BubblNotificationPayload) async throws -> UNNotificationAttachment? {
         guard let media = payload.media,
+              let attachmentURL = BubblNotificationAttachmentPlanner.attachmentURL(for: media),
               BubblNotificationAttachmentPlanner.isEligible(media),
               let fileExtension = BubblNotificationAttachmentPlanner.fileExtension(for: media) else {
             return nil
@@ -39,7 +41,7 @@ public struct URLSessionBubblNotificationAttachmentLoader: BubblNotificationAtta
         let destination = directory.appendingPathComponent(fileName)
 
         if !FileManager.default.fileExists(atPath: destination.path) {
-            let (temporaryURL, _) = try await URLSession.shared.download(from: media.url)
+            let (temporaryURL, _) = try await URLSession.shared.download(from: attachmentURL)
             if FileManager.default.fileExists(atPath: destination.path) {
                 try FileManager.default.removeItem(at: destination)
             }
@@ -56,6 +58,10 @@ public enum BubblNotificationAttachmentPlanner {
             return false
         }
 
+        if youtubeThumbnailURL(for: media) != nil {
+            return true
+        }
+
         if let type = media.type?.lowercased() {
             return type == "image"
                 || type.hasPrefix("image/")
@@ -69,6 +75,10 @@ public enum BubblNotificationAttachmentPlanner {
     }
 
     public static func fileExtension(for media: BubblNotificationMedia) -> String? {
+        if youtubeThumbnailURL(for: media) != nil {
+            return "jpg"
+        }
+
         let explicit = media.url.pathExtension.lowercased()
         if !explicit.isEmpty {
             return explicit
@@ -101,8 +111,164 @@ public enum BubblNotificationAttachmentPlanner {
                 character.isLetter || character.isNumber || character == "-" || character == "_"
                     ? character
                     : "_"
-            }
+        }
         return "\(String(safeId)).\(fileExtension)"
+    }
+
+    public static func attachmentURL(for media: BubblNotificationMedia) -> URL? {
+        guard media.url.scheme == "http" || media.url.scheme == "https" else {
+            return nil
+        }
+
+        return youtubeThumbnailURL(for: media) ?? media.url
+    }
+
+    public static func youtubeEmbedURL(for media: BubblNotificationMedia) -> URL? {
+        guard let id = youtubeVideoID(from: media.url) else {
+            return nil
+        }
+
+        return URL(string: "https://www.youtube.com/embed/\(id)?playsinline=1&rel=0&origin=https%3A%2F%2Fbubbl.tech")
+    }
+
+    public static func youtubeEmbedHTML(for embedURL: URL) -> String {
+        """
+        <!doctype html>
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+              iframe { border: 0; width: 100%; height: 100%; background: #000; }
+            </style>
+          </head>
+          <body>
+            <iframe src="\(embedURL.absoluteString)" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+          </body>
+        </html>
+        """
+    }
+
+    public static func inlineMediaHTML(for media: BubblNotificationMedia) -> String {
+        let url = escapeHTML(media.url.absoluteString)
+        let alt = escapeHTML(media.altText ?? "Notification media")
+        let body: String
+
+        if isImageMedia(media) {
+            body = #"<img src="\#(url)" alt="\#(alt)" />"#
+        } else if isAudioMedia(media) {
+            body = #"<audio src="\#(url)" controls preload="metadata"></audio>"#
+        } else {
+            body = #"<video src="\#(url)" controls playsinline preload="metadata"></video>"#
+        }
+
+        return """
+        <!doctype html>
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+              body { display: flex; align-items: center; justify-content: center; }
+              img, video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+              audio { width: calc(100% - 24px); }
+            </style>
+          </head>
+          <body>
+            \(body)
+          </body>
+        </html>
+        """
+    }
+
+    public static func youtubeThumbnailURL(for media: BubblNotificationMedia) -> URL? {
+        guard let id = youtubeVideoID(from: media.url) else {
+            return nil
+        }
+
+        return URL(string: "https://img.youtube.com/vi/\(id)/hqdefault.jpg")
+    }
+
+    public static func isAudioMedia(_ media: BubblNotificationMedia) -> Bool {
+        if let type = media.type?.lowercased() {
+            return type == "audio" || type.hasPrefix("audio/")
+        }
+
+        let path = media.url.path.lowercased()
+        return path.hasSuffix(".mp3")
+            || path.hasSuffix(".m4a")
+            || path.hasSuffix(".aac")
+            || path.hasSuffix(".wav")
+            || path.hasSuffix(".ogg")
+    }
+
+    public static func isImageMedia(_ media: BubblNotificationMedia) -> Bool {
+        if let type = media.type?.lowercased() {
+            return type == "image" || type.hasPrefix("image/")
+        }
+
+        let path = media.url.path.lowercased()
+        return path.hasSuffix(".png")
+            || path.hasSuffix(".jpg")
+            || path.hasSuffix(".jpeg")
+            || path.hasSuffix(".webp")
+            || path.hasSuffix(".gif")
+    }
+
+    private static func youtubeVideoID(from url: URL) -> String? {
+        guard var host = url.host?.lowercased() else {
+            return nil
+        }
+
+        if host.hasPrefix("www.") {
+            host.removeFirst(4)
+        }
+
+        let segments = url.pathComponents.filter { $0 != "/" }
+
+        if host == "youtu.be" {
+            return validYoutubeID(segments.first)
+        }
+
+        guard host.hasSuffix("youtube.com") || host.hasSuffix("youtube-nocookie.com") else {
+            return nil
+        }
+
+        if let queryId = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "v" })?
+            .value,
+           let valid = validYoutubeID(queryId) {
+            return valid
+        }
+
+        for marker in ["embed", "shorts", "v"] {
+            if let index = segments.firstIndex(of: marker),
+               segments.indices.contains(index + 1),
+               let valid = validYoutubeID(segments[index + 1]) {
+                return valid
+            }
+        }
+
+        return nil
+    }
+
+    private static func validYoutubeID(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              value.range(of: #"^[A-Za-z0-9_-]{6,}$"#, options: .regularExpression) != nil else {
+            return nil
+        }
+
+        return value
+    }
+
+    private static func escapeHTML(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 }
 
@@ -261,12 +427,13 @@ public enum BubblNotificationModalPresenter {
     public static func present(
         _ payload: BubblNotificationPayload,
         sdk: BubblClient = .shared
-    ) -> Bool {
+    ) async -> Bool {
         guard let presenter = topViewController() else {
             return false
         }
 
-        let viewController = BubblNotificationViewController(payload: payload, sdk: sdk)
+        let style = await sdk.defaultNotificationModalStyle()
+        let viewController = BubblNotificationViewController(payload: payload, sdk: sdk, style: style)
         presenter.present(viewController, animated: true)
         return true
     }
@@ -304,13 +471,19 @@ public enum BubblNotificationModalPresenter {
 public final class BubblNotificationViewController: UIViewController {
     private let payload: BubblNotificationPayload
     private let sdk: BubblClient
+    private let palette: BubblNotificationModalPalette
     private var selectedChoices: [String: String] = [:]
     private var textAnswers: [String: UITextField] = [:]
     private var choiceButtons: [String: [UIButton]] = [:]
 
-    public init(payload: BubblNotificationPayload, sdk: BubblClient = .shared) {
+    public init(
+        payload: BubblNotificationPayload,
+        sdk: BubblClient = .shared,
+        style: BubblNotificationModalStyle = .default
+    ) {
         self.payload = payload
         self.sdk = sdk
+        self.palette = BubblNotificationModalPalette(style: style)
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .overFullScreen
         modalTransitionStyle = .crossDissolve
@@ -323,7 +496,7 @@ public final class BubblNotificationViewController: UIViewController {
 
     public override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(white: 0, alpha: 0.32)
+        view.backgroundColor = palette.backdropColor
 
         let scrollView = UIScrollView()
         scrollView.alwaysBounceVertical = true
@@ -336,9 +509,9 @@ public final class BubblNotificationViewController: UIViewController {
         scrollView.addSubview(contentView)
 
         let card = UIView()
-        card.backgroundColor = .white
-        card.layer.cornerRadius = 24
-        card.layer.borderColor = UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1).cgColor
+        card.backgroundColor = palette.cardBackgroundColor
+        card.layer.cornerRadius = palette.cornerRadius
+        card.layer.borderColor = palette.cardBorderColor.cgColor
         card.layer.borderWidth = 1
         card.layer.shadowColor = UIColor.black.cgColor
         card.layer.shadowOpacity = 0.16
@@ -362,9 +535,9 @@ public final class BubblNotificationViewController: UIViewController {
         let icon = UILabel()
         icon.text = "!"
         icon.textAlignment = .center
-        icon.textColor = UIColor(red: 0.03, green: 0.07, blue: 0.12, alpha: 1)
+        icon.textColor = palette.iconTextColor
         icon.font = .systemFont(ofSize: 27, weight: .black)
-        icon.backgroundColor = Self.teal
+        icon.backgroundColor = palette.iconBackgroundColor
         icon.layer.cornerRadius = 26
         icon.clipsToBounds = true
         icon.translatesAutoresizingMaskIntoConstraints = false
@@ -399,21 +572,18 @@ public final class BubblNotificationViewController: UIViewController {
             icon.heightAnchor.constraint(equalToConstant: 52)
         ])
 
-        stack.addArrangedSubview(label(payload.title, font: .preferredFont(forTextStyle: .title2), weight: .black, color: Self.ink, alignment: .center))
+        stack.addArrangedSubview(label(payload.title, font: .preferredFont(forTextStyle: .title2), weight: .black, color: palette.titleColor, alignment: .center))
         if !payload.body.isEmpty {
-            stack.addArrangedSubview(label(payload.body, font: .preferredFont(forTextStyle: .body), weight: .regular, color: Self.slate, alignment: .center))
+            stack.addArrangedSubview(label(payload.body, font: .preferredFont(forTextStyle: .body), weight: .regular, color: palette.bodyColor, alignment: .center))
         }
 
         if let media = payload.media {
-            let button = secondaryButton(media.altText ?? "View media") { [weak self] in
-                guard let self else { return }
-                Task {
-                    try? await self.sdk.handleNotificationMediaViewed(self.payload)
-                    _ = await self.sdk.flush()
-                }
-                UIApplication.shared.open(media.url)
+            trackMediaViewed()
+            if let embedURL = BubblNotificationAttachmentPlanner.youtubeEmbedURL(for: media) {
+                stack.addArrangedSubview(youtubeMediaView(embedURL: embedURL))
+            } else {
+                stack.addArrangedSubview(inlineMediaView(media: media))
             }
-            stack.addArrangedSubview(button)
         }
 
         if let cta = payload.cta {
@@ -441,21 +611,21 @@ public final class BubblNotificationViewController: UIViewController {
             surveyPanel.alignment = .fill
             surveyPanel.isLayoutMarginsRelativeArrangement = true
             surveyPanel.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
-            surveyPanel.backgroundColor = Self.cloud
+            surveyPanel.backgroundColor = palette.surveyBackgroundColor
             surveyPanel.layer.cornerRadius = 18
-            surveyPanel.layer.borderColor = UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1).cgColor
+            surveyPanel.layer.borderColor = palette.cardBorderColor.cgColor
             surveyPanel.layer.borderWidth = 1
 
             survey.questions.forEach { question in
-                surveyPanel.addArrangedSubview(label(question.title, font: .preferredFont(forTextStyle: .headline), weight: .bold, color: Self.ink, alignment: .center))
+                surveyPanel.addArrangedSubview(label(question.title, font: .preferredFont(forTextStyle: .headline), weight: .bold, color: palette.titleColor, alignment: .center))
 
                 if question.choices.isEmpty {
                     let input = UITextField()
                     input.placeholder = "Your answer"
-                    input.backgroundColor = .white
-                    input.textColor = Self.ink
+                    input.backgroundColor = palette.inputBackgroundColor
+                    input.textColor = palette.inputTextColor
                     input.layer.cornerRadius = 14
-                    input.layer.borderColor = UIColor(red: 0.80, green: 0.84, blue: 0.90, alpha: 1).cgColor
+                    input.layer.borderColor = palette.inputBorderColor.cgColor
                     input.layer.borderWidth = 1
                     input.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 14, height: 1))
                     input.leftViewMode = .always
@@ -548,9 +718,9 @@ public final class BubblNotificationViewController: UIViewController {
         button.titleLabel?.font = .preferredFont(forTextStyle: .headline)
         button.titleLabel?.numberOfLines = 0
         button.titleLabel?.lineBreakMode = .byWordWrapping
-        button.setTitleColor(Self.ink, for: .normal)
-        button.backgroundColor = Self.teal
-        button.layer.cornerRadius = 26
+        button.setTitleColor(palette.primaryButtonTextColor, for: .normal)
+        button.backgroundColor = palette.primaryButtonBackgroundColor
+        button.layer.cornerRadius = palette.buttonCornerRadius
         button.contentEdgeInsets = UIEdgeInsets(top: 14, left: 18, bottom: 14, right: 18)
         button.heightAnchor.constraint(greaterThanOrEqualToConstant: 52).isActive = true
         button.addAction(UIAction { _ in action() }, for: .touchUpInside)
@@ -559,10 +729,58 @@ public final class BubblNotificationViewController: UIViewController {
 
     private func secondaryButton(_ title: String, action: @escaping () -> Void) -> UIButton {
         let button = primaryButton(title, action: action)
-        button.backgroundColor = UIColor(red: 0.93, green: 0.95, blue: 0.98, alpha: 1)
-        button.layer.borderColor = UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1).cgColor
+        button.setTitleColor(palette.secondaryButtonTextColor, for: .normal)
+        button.backgroundColor = palette.secondaryButtonBackgroundColor
+        button.layer.borderColor = palette.cardBorderColor.cgColor
         button.layer.borderWidth = 1
         return button
+    }
+
+    private func youtubeMediaView(embedURL: URL) -> UIView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        if #available(iOS 10.0, *) {
+            configuration.mediaTypesRequiringUserActionForPlayback = []
+        }
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.backgroundColor = .black
+        webView.scrollView.isScrollEnabled = false
+        webView.layer.cornerRadius = 16
+        webView.clipsToBounds = true
+        webView.heightAnchor.constraint(equalToConstant: 210).isActive = true
+        webView.loadHTMLString(
+            BubblNotificationAttachmentPlanner.youtubeEmbedHTML(for: embedURL),
+            baseURL: URL(string: "https://bubbl.tech")
+        )
+        return webView
+    }
+
+    private func inlineMediaView(media: BubblNotificationMedia) -> UIView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        if #available(iOS 10.0, *) {
+            configuration.mediaTypesRequiringUserActionForPlayback = []
+        }
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.backgroundColor = .black
+        webView.scrollView.isScrollEnabled = false
+        webView.layer.cornerRadius = 16
+        webView.clipsToBounds = true
+        webView.heightAnchor.constraint(equalToConstant: BubblNotificationAttachmentPlanner.isAudioMedia(media) ? 88 : 210).isActive = true
+        webView.loadHTMLString(
+            BubblNotificationAttachmentPlanner.inlineMediaHTML(for: media),
+            baseURL: URL(string: "https://bubbl.tech")
+        )
+        return webView
+    }
+
+    private func trackMediaViewed() {
+        Task {
+            try? await sdk.handleNotificationMediaViewed(payload)
+            _ = await sdk.flush()
+        }
     }
 
     private func makeChoiceButton(_ title: String) -> UIButton {
@@ -582,7 +800,7 @@ public final class BubblNotificationViewController: UIViewController {
         let button = UIButton(type: .system)
         button.setTitle(title, for: .normal)
         button.titleLabel?.font = .preferredFont(forTextStyle: .headline)
-        button.setTitleColor(Self.slate, for: .normal)
+        button.setTitleColor(palette.textButtonColor, for: .normal)
         button.contentEdgeInsets = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
         button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
         button.addAction(UIAction { _ in action() }, for: .touchUpInside)
@@ -590,17 +808,98 @@ public final class BubblNotificationViewController: UIViewController {
     }
 
     private func applyChoiceStyle(_ button: UIButton, selected: Bool) {
-        button.backgroundColor = selected ? Self.teal : .white
-        button.setTitleColor(Self.ink, for: .normal)
-        button.layer.cornerRadius = 23
-        button.layer.borderColor = (selected ? Self.teal : UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1)).cgColor
+        button.backgroundColor = selected ? palette.primaryButtonBackgroundColor : palette.inputBackgroundColor
+        button.setTitleColor(selected ? palette.primaryButtonTextColor : palette.inputTextColor, for: .normal)
+        button.layer.cornerRadius = palette.buttonCornerRadius
+        button.layer.borderColor = (selected ? palette.primaryButtonBackgroundColor : palette.inputBorderColor).cgColor
         button.layer.borderWidth = 1
     }
+}
 
-    private static let ink = UIColor(red: 0.03, green: 0.07, blue: 0.12, alpha: 1)
-    private static let slate = UIColor(red: 0.29, green: 0.33, blue: 0.40, alpha: 1)
-    private static let cloud = UIColor(red: 0.97, green: 0.98, blue: 0.99, alpha: 1)
-    private static let teal = UIColor(red: 0.16, green: 0.77, blue: 0.73, alpha: 1)
+private struct BubblNotificationModalPalette {
+    let backdropColor: UIColor
+    let cardBackgroundColor: UIColor
+    let cardBorderColor: UIColor
+    let titleColor: UIColor
+    let bodyColor: UIColor
+    let iconBackgroundColor: UIColor
+    let iconTextColor: UIColor
+    let primaryButtonBackgroundColor: UIColor
+    let primaryButtonTextColor: UIColor
+    let secondaryButtonBackgroundColor: UIColor
+    let secondaryButtonTextColor: UIColor
+    let textButtonColor: UIColor
+    let surveyBackgroundColor: UIColor
+    let inputBackgroundColor: UIColor
+    let inputTextColor: UIColor
+    let inputBorderColor: UIColor
+    let cornerRadius: CGFloat
+    let buttonCornerRadius: CGFloat
+
+    init(style: BubblNotificationModalStyle) {
+        let dark = style.theme == .dark
+        let ink = dark ? UIColor(red: 0.95, green: 0.97, blue: 1, alpha: 1) : UIColor(red: 0.03, green: 0.07, blue: 0.12, alpha: 1)
+        let slate = dark ? UIColor(red: 0.76, green: 0.82, blue: 0.90, alpha: 1) : UIColor(red: 0.29, green: 0.33, blue: 0.40, alpha: 1)
+        let card = dark ? UIColor(red: 0.04, green: 0.08, blue: 0.14, alpha: 1) : .white
+        let panel = dark ? UIColor(red: 0.07, green: 0.12, blue: 0.20, alpha: 1) : UIColor(red: 0.97, green: 0.98, blue: 0.99, alpha: 1)
+        let border = dark ? UIColor(red: 0.18, green: 0.26, blue: 0.36, alpha: 1) : UIColor(red: 0.88, green: 0.91, blue: 0.95, alpha: 1)
+        let input = dark ? UIColor(red: 0.02, green: 0.05, blue: 0.09, alpha: 1) : .white
+        let secondary = dark ? UIColor(red: 0.12, green: 0.18, blue: 0.27, alpha: 1) : UIColor(red: 0.93, green: 0.95, blue: 0.98, alpha: 1)
+        let teal = UIColor(red: 0.16, green: 0.77, blue: 0.73, alpha: 1)
+
+        backdropColor = style.transparentBackdrop
+            ? .clear
+            : UIColor.bubblHex(style.backdropColor, fallback: UIColor(white: 0, alpha: 0.32))
+        cardBackgroundColor = UIColor.bubblHex(style.cardBackgroundColor, fallback: card)
+        cardBorderColor = UIColor.bubblHex(style.cardBorderColor, fallback: border)
+        titleColor = UIColor.bubblHex(style.titleColor, fallback: ink)
+        bodyColor = UIColor.bubblHex(style.bodyColor, fallback: slate)
+        iconBackgroundColor = UIColor.bubblHex(style.iconBackgroundColor ?? style.accentColor, fallback: teal)
+        iconTextColor = UIColor.bubblHex(style.iconTextColor, fallback: dark ? UIColor(red: 0.02, green: 0.05, blue: 0.09, alpha: 1) : ink)
+        primaryButtonBackgroundColor = UIColor.bubblHex(style.primaryButtonBackgroundColor ?? style.accentColor, fallback: teal)
+        primaryButtonTextColor = UIColor.bubblHex(style.primaryButtonTextColor, fallback: dark ? UIColor(red: 0.02, green: 0.05, blue: 0.09, alpha: 1) : ink)
+        secondaryButtonBackgroundColor = UIColor.bubblHex(style.secondaryButtonBackgroundColor, fallback: secondary)
+        secondaryButtonTextColor = UIColor.bubblHex(style.secondaryButtonTextColor, fallback: ink)
+        textButtonColor = UIColor.bubblHex(style.textButtonColor, fallback: slate)
+        surveyBackgroundColor = UIColor.bubblHex(style.surveyBackgroundColor, fallback: panel)
+        inputBackgroundColor = UIColor.bubblHex(style.inputBackgroundColor, fallback: input)
+        inputTextColor = UIColor.bubblHex(style.inputTextColor, fallback: ink)
+        inputBorderColor = UIColor.bubblHex(style.inputBorderColor, fallback: dark ? border : UIColor(red: 0.80, green: 0.84, blue: 0.90, alpha: 1))
+        cornerRadius = CGFloat(style.cornerRadius ?? 24)
+        buttonCornerRadius = CGFloat(style.buttonCornerRadius ?? 26)
+    }
+}
+
+private extension UIColor {
+    static func bubblHex(_ value: String?, fallback: UIColor) -> UIColor {
+        guard var raw = value?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return fallback
+        }
+        if raw.hasPrefix("#") {
+            raw.removeFirst()
+        }
+        guard let int = UInt64(raw, radix: 16) else {
+            return fallback
+        }
+        switch raw.count {
+        case 6:
+            return UIColor(
+                red: CGFloat((int >> 16) & 0xff) / 255,
+                green: CGFloat((int >> 8) & 0xff) / 255,
+                blue: CGFloat(int & 0xff) / 255,
+                alpha: 1
+            )
+        case 8:
+            return UIColor(
+                red: CGFloat((int >> 24) & 0xff) / 255,
+                green: CGFloat((int >> 16) & 0xff) / 255,
+                blue: CGFloat((int >> 8) & 0xff) / 255,
+                alpha: CGFloat(int & 0xff) / 255
+            )
+        default:
+            return fallback
+        }
+    }
 }
 #endif
 
