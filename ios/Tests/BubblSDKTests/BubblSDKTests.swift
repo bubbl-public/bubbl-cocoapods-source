@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.0.2")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.0.3")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -1074,7 +1074,7 @@ final class BubblSDKTests: XCTestCase {
         try await sdk.handleNotificationSurveyRequested(payload)
 
         let diagnostics = await sdk.diagnostics()
-        XCTAssertEqual(diagnostics.pendingIngestCount, 3)
+        XCTAssertEqual(diagnostics.pendingIngestCount, 4)
 
         _ = await sdk.flush()
 
@@ -1086,6 +1086,7 @@ final class BubblSDKTests: XCTestCase {
                 return try XCTUnwrap(json?["activity"] as? String)
             }
 
+        XCTAssertTrue(activities.contains("notification_opened"))
         XCTAssertEqual(activities.filter { $0 == "cta_engagment" }.count, 1)
         XCTAssertTrue(activities.contains("media_viewed"))
     }

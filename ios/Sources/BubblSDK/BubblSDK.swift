@@ -878,8 +878,9 @@ private func dashboardActivityName(_ activity: String) -> String? {
         return "media_viewed"
     case "notification_dismissed":
         return "dismissed"
-    case "notification_opened",
-         "notification_survey_requested":
+    case "notification_opened":
+        return "notification_opened"
+    case "notification_survey_requested":
         return nil
     default:
         return activity
