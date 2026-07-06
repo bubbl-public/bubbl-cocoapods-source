@@ -1252,12 +1252,24 @@ private extension Array where Element == String {
     func firstNonEmpty(_ transform: (String) -> String?) -> String? {
         for key in self {
             guard let value = transform(key)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !value.isEmpty else {
+                  !value.isEmpty,
+                  !value.isNullPlaceholder else {
                 continue
             }
             return value
         }
 
         return nil
+    }
+}
+
+private extension String {
+    var isNullPlaceholder: Bool {
+        switch lowercased() {
+        case "null", "<null>", "(null)":
+            true
+        default:
+            false
+        }
     }
 }

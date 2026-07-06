@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.0.3")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.0.4")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -445,6 +445,57 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertEqual(payload.curatedNotificationId, "456")
         XCTAssertEqual(payload.locationId, "10")
         XCTAssertEqual(payload.cta?.label, "Open")
+    }
+
+    func testIgnoresNullRuntimeSurveyCTAValues() throws {
+        let response = """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": 123,
+                  "campaignName": "Survey offers",
+                  "type": "GEO",
+                  "active": "true",
+                  "locationsArray": {"locationId": 10},
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": 456,
+                      "headline": "Welcome",
+                      "body": "Thanks for visiting",
+                      "type": "notification",
+                      "cta": [
+                        {
+                          "label": null,
+                          "url": null
+                        }
+                      ],
+                      "questions": [
+                        {
+                          "id": 1,
+                          "title": "How was it?",
+                          "type": "single_choice",
+                          "choices": [
+                            {
+                              "id": 5,
+                              "label": "Great"
+                            }
+                          ]
+                        }
+                      ],
+                      "published": true
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.data(using: .utf8)!
+
+        let payload = try XCTUnwrap(BubblNotificationPayloadParser.fromRuntimeResponse(response).single)
+
+        XCTAssertNil(payload.cta)
+        XCTAssertEqual(payload.survey?.questions.single?.choices.single?.label, "Great")
     }
 
     func testIgnoresPausedRuntimeCampaignNotifications() {
@@ -1089,6 +1140,70 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertTrue(activities.contains("notification_opened"))
         XCTAssertEqual(activities.filter { $0 == "cta_engagment" }.count, 1)
         XCTAssertTrue(activities.contains("media_viewed"))
+    }
+
+    func testNotificationOpenQueuesPendingTapUntilFlutterSubscriberDrains() async throws {
+        let transport = MockTransport { _ in
+            BubblHTTPResponse(statusCode: 200, data: #"{"success":true}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+
+        _ = try await sdk.boot(
+            BubblConfig(
+                apiKey: "sdk-key",
+                runtimeBaseUrl: URL(string: "https://runtime.test")!,
+                ingestBaseUrl: URL(string: "https://ingest.test")!
+            )
+        )
+
+        let payload = BubblNotificationPayload(
+            id: "tap-1",
+            title: "Opened",
+            body: "From tray",
+            source: .apns,
+            locationId: "7",
+            curatedNotificationId: "42"
+        )
+
+        try await sdk.handleNotificationOpen(payload, action: "default")
+
+        let pending = await sdk.drainPendingNotificationTaps()
+        XCTAssertEqual(pending.count, 1)
+        XCTAssertEqual(pending.single?.payload.id, "tap-1")
+        XCTAssertEqual(pending.single?.action, "default")
+        let remaining = await sdk.drainPendingNotificationTaps()
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
+    func testNotificationOpenDoesNotQueueWhenFlutterSubscriberIsAttached() async throws {
+        let transport = MockTransport { _ in
+            BubblHTTPResponse(statusCode: 200, data: #"{"success":true}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+
+        _ = try await sdk.boot(
+            BubblConfig(
+                apiKey: "sdk-key",
+                runtimeBaseUrl: URL(string: "https://runtime.test")!,
+                ingestBaseUrl: URL(string: "https://ingest.test")!
+            )
+        )
+
+        let subscriberId = await sdk.registerEventSubscriber()
+
+        try await sdk.handleNotificationOpen(
+            BubblNotificationPayload(
+                id: "tap-2",
+                title: "Opened",
+                body: "From tray",
+                source: .apns
+            ),
+            action: "default"
+        )
+
+        let pending = await sdk.drainPendingNotificationTaps()
+        XCTAssertTrue(pending.isEmpty)
+        await sdk.unregisterEventSubscriber(subscriberId)
     }
 
     private func temporaryDirectory() -> URL {

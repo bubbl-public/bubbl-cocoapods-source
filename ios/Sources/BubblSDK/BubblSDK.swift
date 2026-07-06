@@ -13,6 +13,8 @@ public final actor BubblClient {
     private var state: BubblStoredState?
     private var booted = false
     private var cachedConfiguration: BubblConfiguration?
+    private var eventSubscriberIds = Set<String>()
+    private var pendingNotificationTaps: [BubblNotificationTap] = []
 
     public init(
         storageDirectory: URL? = nil,
@@ -62,6 +64,22 @@ public final actor BubblClient {
     public func shutdown() async {
         booted = false
         config = nil
+    }
+
+    @discardableResult
+    public func registerEventSubscriber(_ id: String = UUID().uuidString) -> String {
+        eventSubscriberIds.insert(id)
+        return id
+    }
+
+    public func unregisterEventSubscriber(_ id: String) {
+        eventSubscriberIds.remove(id)
+    }
+
+    public func drainPendingNotificationTaps() -> [BubblNotificationTap] {
+        let taps = pendingNotificationTaps
+        pendingNotificationTaps.removeAll()
+        return taps
     }
 
     public func refresh() async throws {
@@ -286,8 +304,21 @@ public final actor BubblClient {
 
     public func handleNotificationOpen(_ payload: BubblNotificationPayload, action: String? = nil) async throws {
         _ = try requireConfig()
+        queuePendingNotificationTapIfNeeded(BubblNotificationTap(payload: payload, action: action))
         streamContinuation.yield(.notificationTapped(payload, action: action))
         try await track(notificationInteractionEvent(payload, activity: "notification_opened"))
+    }
+
+    private func queuePendingNotificationTapIfNeeded(_ tap: BubblNotificationTap) {
+        guard eventSubscriberIds.isEmpty else { return }
+        let alreadyQueued = pendingNotificationTaps.contains { pending in
+            pending.payload.id == tap.payload.id && pending.action == tap.action
+        }
+        guard !alreadyQueued else { return }
+        pendingNotificationTaps.append(tap)
+        if pendingNotificationTaps.count > 20 {
+            pendingNotificationTaps.removeFirst(pendingNotificationTaps.count - 20)
+        }
     }
 
     public func openNotificationModal(_ payload: BubblNotificationPayload, action: String? = nil) async throws -> Bool {
