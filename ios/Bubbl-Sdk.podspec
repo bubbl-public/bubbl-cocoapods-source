@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name = 'Bubbl-Sdk'
-  s.version = '4.1.5'
+  s.version = '4.1.6'
   s.summary = 'Compatibility CocoaPods alias for the Bubbl v3 iOS SDK.'
   s.description = 'Bubbl-Sdk keeps the legacy CocoaPods package identity available while depending on the v3 BubblSDK pod.'
   s.homepage = 'https://bubbl.tech'
