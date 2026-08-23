@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.0.4")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.1.4")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -1204,6 +1204,169 @@ final class BubblSDKTests: XCTestCase {
         let pending = await sdk.drainPendingNotificationTaps()
         XCTAssertTrue(pending.isEmpty)
         await sdk.unregisterEventSubscriber(subscriberId)
+    }
+
+    // --- Fix 2: 4xx vs 5xx differentiation ---
+
+    func testFlushDropsQueueOn4xxResponses() async throws {
+        var requests: [BubblHTTPRequest] = []
+        let transport = MockTransport { request in
+            requests.append(request)
+            return BubblHTTPResponse(statusCode: 400, data: #"{"error":"bad request"}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+        _ = try await sdk.boot(BubblConfig(apiKey: "sdk-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+
+        let flush = await sdk.flush()
+        // 4xx is permanent failure — item should be dropped (not retried)
+        XCTAssertEqual(flush.pendingCount, 0)
+        XCTAssertEqual(requests.count, 1)
+    }
+
+    func testFlushRetriesQueueOn5xxResponses() async throws {
+        let transport = MockTransport { _ in
+            BubblHTTPResponse(statusCode: 500, data: #"{"error":"internal"}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+        _ = try await sdk.boot(BubblConfig(apiKey: "sdk-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+
+        let flush = await sdk.flush()
+        // 5xx is retryable — item should remain in queue
+        XCTAssertEqual(flush.pendingCount, 1)
+    }
+
+    func testFlushDropsQueueOn401Unauthorized() async throws {
+        let transport = MockTransport { _ in
+            BubblHTTPResponse(statusCode: 401, data: #"{"error":"unauthorized"}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+        _ = try await sdk.boot(BubblConfig(apiKey: "sdk-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+
+        let flush = await sdk.flush()
+        XCTAssertEqual(flush.pendingCount, 0)
+    }
+
+    func testFlushEmitsPermanentErrorEventOn4xx() async throws {
+        let transport = MockTransport { _ in
+            BubblHTTPResponse(statusCode: 400, data: #"{"error":"bad request"}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+        _ = try await sdk.boot(BubblConfig(apiKey: "sdk-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+
+        // Flush should drop the item on 4xx (permanent failure)
+        let flush = await sdk.flush()
+        XCTAssertEqual(flush.pendingCount, 0)
+    }
+
+    // --- Fix 7: Boot guard ---
+
+    func testDoubleBootDoesNotEnqueueDuplicatePayload() async throws {
+        var requests: [BubblHTTPRequest] = []
+        let transport = MockTransport { request in
+            requests.append(request)
+            return BubblHTTPResponse(statusCode: 200, data: #"{"success":true}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+
+        _ = try await sdk.boot(BubblConfig(apiKey: "sdk-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+        // Second boot should NOT enqueue another device-data payload
+        _ = try await sdk.boot(BubblConfig(apiKey: "sdk-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+
+        let flush = await sdk.flush()
+        XCTAssertEqual(flush.pendingCount, 0)
+        // Only 1 request from the first boot
+        XCTAssertEqual(requests.count, 1)
+    }
+
+    func testDoubleBootUpdatesConfig() async throws {
+        let transport = MockTransport { _ in
+            BubblHTTPResponse(statusCode: 200, data: #"{"success":true}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+
+        _ = try await sdk.boot(BubblConfig(apiKey: "first-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+        let result = try await sdk.boot(BubblConfig(apiKey: "second-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+
+        XCTAssertTrue(result.ready)
+    }
+
+    // --- Fix 8: Queue TTL ---
+
+    func testFlushSendsFreshItems() async throws {
+        var requests: [BubblHTTPRequest] = []
+        let transport = MockTransport { request in
+            requests.append(request)
+            return BubblHTTPResponse(statusCode: 200, data: #"{"success":true}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+        _ = try await sdk.boot(BubblConfig(apiKey: "sdk-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+
+        // Boot item is fresh (just created) — should be sent
+        let flush = await sdk.flush()
+        XCTAssertEqual(flush.pendingCount, 0)
+        XCTAssertEqual(requests.count, 1)
+    }
+
+    func testFlushDropsStaleItems() async throws {
+        var requests: [BubblHTTPRequest] = []
+        let transport = MockTransport { request in
+            requests.append(request)
+            return BubblHTTPResponse(statusCode: 200, data: #"{"success":true}"#.data(using: .utf8)!)
+        }
+        let dir = temporaryDirectory()
+        let sdk = BubblClient(storageDirectory: dir, transport: transport)
+        _ = try await sdk.boot(BubblConfig(apiKey: "sdk-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+
+        // Insert a stale item (25h old) directly into the store
+        let staleItem = BubblQueuedRequest(
+            path: "/api/device-data",
+            body: #"{"test":"stale"}"#.data(using: .utf8)!,
+            createdAt: Date().addingTimeInterval(-90000) // 25h ago
+        )
+        let store = await sdk.store
+        var queue = try store.loadQueue()
+        queue.append(staleItem)
+        try store.saveQueue(queue)
+
+        // Flush: fresh boot item should be sent, stale item should be dropped
+        let flush = await sdk.flush()
+        XCTAssertEqual(flush.pendingCount, 0)
+        XCTAssertEqual(requests.count, 1) // Only the fresh boot item was sent
+    }
+
+    func testEnqueueEvictsOldestWhenQueueIsFull() async throws {
+        var requests: [BubblHTTPRequest] = []
+        let transport = MockTransport { request in
+            requests.append(request)
+            return BubblHTTPResponse(statusCode: 200, data: #"{"success":true}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(storageDirectory: temporaryDirectory(), transport: transport)
+        _ = try await sdk.boot(BubblConfig(apiKey: "sdk-key", ingestBaseUrl: URL(string: "https://ingest.test")!))
+
+        // Queue has 1 item from boot. Fill to maxQueueSize (1000) by writing directly.
+        let store = await sdk.store
+        var queue = try store.loadQueue()
+        let existingCount = queue.count
+        for i in 0..<(1000 - existingCount) {
+            queue.append(BubblQueuedRequest(
+                path: "/api/test",
+                body: #"{"index":\#(i)}"#.data(using: .utf8)!,
+                createdAt: Date().addingTimeInterval(-Double(1000 - i))
+            ))
+        }
+        try store.saveQueue(queue)
+        XCTAssertEqual(try store.loadQueue().count, 1000)
+
+        // Trigger enqueue via registerPushToken — should evict oldest, then add new
+        try await sdk.registerPushToken("test-token")
+
+        // Queue should still be at 1000 (oldest was evicted, new one added)
+        XCTAssertEqual(try store.loadQueue().count, 1000)
+
+        // Flush everything and verify count
+        let flush = await sdk.flush()
+        XCTAssertEqual(flush.pendingCount, 0)
+        XCTAssertEqual(requests.count, 1000)
     }
 
     private func temporaryDirectory() -> URL {

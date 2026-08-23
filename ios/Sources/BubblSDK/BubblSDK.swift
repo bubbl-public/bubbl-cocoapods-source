@@ -4,10 +4,13 @@ import UserNotifications
 public final actor BubblClient {
     public static let shared = BubblClient()
 
-    private let streamContinuation: AsyncStream<BubblEvent>.Continuation
+    private static let maxQueueSize = 1000
+    private static let maxItemAgeSeconds: TimeInterval = 86400 // 24 hours
+
+    public let streamContinuation: AsyncStream<BubblEvent>.Continuation
     public let events: AsyncStream<BubblEvent>
     private let transport: any BubblHTTPTransport
-    private let store: BubblPersistentStore
+    let store: BubblPersistentStore
     private let notificationPresenter: any BubblNotificationPresenting
     private var config: BubblConfig?
     private var state: BubblStoredState?
@@ -32,6 +35,19 @@ public final actor BubblClient {
     public func boot(_ config: BubblConfig) async throws -> BubblBootResult {
         guard !config.apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw BubblError.invalidConfig("apiKey is required")
+        }
+
+        // Guard against double-boot: update config but don't re-enqueue.
+        if booted {
+            try saveConfig(config)
+            self.config = config
+            return BubblBootResult(
+                ready: true,
+                fromCache: cachedConfiguration != nil,
+                deviceRegistered: false,
+                requiresPermission: config.requiredPermissions,
+                warnings: []
+            )
         }
 
         var storedState = try loadState()
@@ -420,7 +436,22 @@ public final actor BubblClient {
         }
 
         do {
-            let queue = try store.loadQueue()
+            let rawQueue = try store.loadQueue()
+
+            // Drop stale items older than maxItemAgeSeconds.
+            let now = Date()
+            let queue = rawQueue.filter { entry in
+                let age = now.timeIntervalSince(entry.createdAt)
+                if age > Self.maxItemAgeSeconds {
+                    streamContinuation.yield(.error(
+                        code: "ingest_stale_item_dropped",
+                        message: "Dropped item older than \(Int(Self.maxItemAgeSeconds))s: \(entry.path)"
+                    ))
+                    return false
+                }
+                return true
+            }
+
             var remaining: [BubblQueuedRequest] = []
 
             for var entry in queue {
@@ -568,7 +599,13 @@ public final actor BubblClient {
 
     private func enqueue(path: String, payload: [String: Any]) throws {
         let body = try jsonData(payload)
-        try store.append(BubblQueuedRequest(path: path, body: body))
+        var queue = try store.loadQueue()
+        // Evict oldest if at capacity
+        while queue.count >= Self.maxQueueSize {
+            queue.removeFirst()
+        }
+        queue.append(BubblQueuedRequest(path: path, body: body))
+        try store.saveQueue(queue)
     }
 
     private func sendRuntime(method: String, path: String, body: Data?, cacheName: String) async throws -> Data {
@@ -610,7 +647,17 @@ public final actor BubblClient {
         )
         let response = try await transport.send(request)
 
-        guard (200..<300).contains(response.statusCode) else {
+        switch response.statusCode {
+        case 200..<300:
+            return // success
+        case 400..<500:
+            // Permanent failure — drop the request, emit error event.
+            streamContinuation.yield(.error(
+                code: "ingest_permanent_failure",
+                message: "HTTP \(response.statusCode) for \(entry.path) — dropping request"
+            ))
+            return // don't throw — caller treats this as "sent" (removed from queue)
+        default:
             throw BubblError.invalidResponse("Ingest returned HTTP \(response.statusCode).")
         }
     }
