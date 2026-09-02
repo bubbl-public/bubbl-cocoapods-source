@@ -386,11 +386,11 @@ public final actor BubblClient {
             "time": isoNow()
         ]
 
-        if let locationId = intString(event.locationId) {
+        if let locationId = event.locationId {
             payload["location_id"] = locationId
         }
         if event.type == "notification" {
-            guard let value = event.curatedNotificationId, let curatedNotificationId = Int(value) else {
+            guard let curatedNotificationId = event.curatedNotificationId else {
                 streamContinuation.yield(
                     .error(
                         code: "notification_missing_curated_id",
@@ -400,7 +400,7 @@ public final actor BubblClient {
                 return
             }
             payload["curated_notification_id"] = curatedNotificationId
-        } else if let value = event.curatedNotificationId, let curatedNotificationId = Int(value) {
+        } else if let curatedNotificationId = event.curatedNotificationId {
             payload["curated_notification_id"] = curatedNotificationId
         }
         if let latitude = event.latitude {
@@ -418,12 +418,12 @@ public final actor BubblClient {
         var payload: [String: Any] = [
             "device_registered_id": activeState.installId,
             "activity": "survey_submit",
-            "curated_notification_id": intString(response.curatedNotificationId) ?? response.curatedNotificationId,
+            "curated_notification_id": response.curatedNotificationId,
             "responses": response.answers.map(surveyAnswerPayload),
             "time": isoNow()
         ]
 
-        if let locationId = intString(response.locationId) {
+        if let locationId = response.locationId {
             payload["location_id"] = locationId
         }
 
@@ -824,10 +824,10 @@ public final actor BubblClient {
 
     private func surveyAnswerPayload(_ answer: BubblSurveyAnswer) -> [String: Any] {
         [
-            "question_id": intString(answer.questionId) ?? answer.questionId,
+            "question_id": answer.questionId,
             "type": answer.type,
             "value": answer.value as Any,
-            "choice": answer.choiceIds.map { ["choice_id": intString($0) ?? $0] }
+            "choice": answer.choiceIds.map { ["choice_id": $0] }
         ]
     }
 
@@ -873,8 +873,8 @@ public final actor BubblClient {
         let transition = dispatch.transition
         let payload = dispatch.payload
 
-        guard let notificationId = payload.curatedNotificationId.flatMap(Int.init),
-              let locationId = Int(transition.locationId ?? payload.locationId ?? "") else {
+        guard let notificationId = payload.curatedNotificationId,
+              let locationId = transition.locationId ?? payload.locationId else {
             return
         }
 
@@ -940,11 +940,6 @@ private func normalizeJSON(_ value: Any) -> Any {
     }
 
     return value
-}
-
-private func intString(_ value: String?) -> Any? {
-    guard let value else { return nil }
-    return Int(value) ?? value
 }
 
 private func dashboardActivityName(_ activity: String) -> String? {

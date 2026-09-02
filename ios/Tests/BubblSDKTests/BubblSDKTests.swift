@@ -56,7 +56,7 @@ final class BubblSDKTests: XCTestCase {
             XCTAssertEqual(request.url.path, "/api/device-data")
             XCTAssertEqual(request.method, "POST")
             XCTAssertEqual(request.headers["ApiKey"], "sdk-key")
-            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.1.6")
+            XCTAssertEqual(request.headers["X-Bubbl-SDK-Version"], "4.1.7")
             XCTAssertEqual(request.headers["X-Bubbl-SDK-Platform"], "ios")
             XCTAssertNotNil(request.headers["Idempotency-Key"])
             XCTAssertNotNil(request.headers["X-Bubbl-Install-ID"])
@@ -947,6 +947,55 @@ final class BubblSDKTests: XCTestCase {
         XCTAssertTrue(activities.contains("notification_delivered"))
     }
 
+    // Regression test for a bug where UUID-formatted location/notification ids
+    // (post BIGINT->UUID backend migration) were silently dropped: the batch
+    // builder used to require `Int(id)` to succeed, so any non-numeric id
+    // caused the whole geofence notification batch to be discarded with no
+    // error. Ids must now survive as plain strings.
+    func testRefreshGeofenceSendsUuidFormattedIdsInGeofenceBatch() async throws {
+        let uuidLocationId = "3c1c3c1b-2b7b-4b8e-a0a1-6f7a1a2b3c4d"
+        let uuidNotificationId = "8f14e45f-ceea-467e-adc9-15476b1173e9"
+        let presenter = MockNotificationPresenter()
+        let transport = MockTransport { request in
+            if request.url.path == "/api/check-geofence" {
+                return BubblHTTPResponse(
+                    statusCode: 200,
+                    data: self.geofenceRuntimeResponseWithUuidIds(
+                        locationId: uuidLocationId,
+                        curatedNotificationId: uuidNotificationId
+                    )
+                )
+            }
+
+            return BubblHTTPResponse(statusCode: 200, data: #"{"success":true}"#.data(using: .utf8)!)
+        }
+        let sdk = BubblClient(
+            storageDirectory: temporaryDirectory(),
+            transport: transport,
+            notificationPresenter: presenter
+        )
+
+        _ = try await sdk.boot(
+            BubblConfig(
+                apiKey: "sdk-key",
+                runtimeBaseUrl: URL(string: "https://runtime.test")!,
+                ingestBaseUrl: URL(string: "https://ingest.test")!
+            )
+        )
+
+        try await sdk.refreshGeofence(BubblLocation(latitude: 51.50158, longitude: -0.141))
+
+        let batchRequest = try XCTUnwrap(
+            transport.requests.first { $0.url.path == "/api/geofence-data" }
+        )
+        let body = try XCTUnwrap(batchRequest.body)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let geo = try XCTUnwrap(json["geo"] as? [String: Any])
+        let notification = try XCTUnwrap(json["notification"] as? [String: Any])
+        XCTAssertEqual(geo["location_id"] as? String, uuidLocationId)
+        XCTAssertEqual(notification["curated_notification_id"] as? String, uuidNotificationId)
+    }
+
     func testGeofenceRegionSelectionCapsToNearestTwenty() {
         let reference = BubblLocation(latitude: 51.5002, longitude: -0.1402)
 
@@ -1002,7 +1051,7 @@ final class BubblSDKTests: XCTestCase {
         let activities = try activityRequests.map { request -> String in
             let body = try XCTUnwrap(request.body)
             let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
-            XCTAssertEqual(json?["curated_notification_id"] as? Int, 99)
+            XCTAssertEqual(json?["curated_notification_id"] as? String, "99")
             return try XCTUnwrap(json?["activity"] as? String)
         }
         XCTAssertTrue(activities.contains("notification_sent"))
@@ -1410,6 +1459,43 @@ final class BubblSDKTests: XCTestCase {
                       "type": "notification",
                       "activation": "ON_EXIT",
                       "published": true
+                    }
+                  ]
+                }
+              ],
+              "pushCampaign": [],
+              "configuration": {"notificationsCount":10,"daysCount":1,"batteryCount":10,"privacyText":"Privacy"}
+            }
+        """.data(using: .utf8)!
+    }
+
+    private func geofenceRuntimeResponseWithUuidIds(locationId: String, curatedNotificationId: String) -> Data {
+        """
+            {
+              "geoCampaign": [
+                {
+                  "campaignId": "9c858901-8a57-4791-81fe-4c455b099bc9",
+                  "campaignName": "Spring offers",
+                  "type": "GEO",
+                  "active": "true",
+                  "locationsArray": {
+                    "locationId": "\(locationId)",
+                    "geofence": [
+                      { "position": 1, "latitude": "51.501476", "longitude": "-0.140112" },
+                      { "position": 2, "latitude": "51.501800", "longitude": "-0.141000" },
+                      { "position": 3, "latitude": "51.501476", "longitude": "-0.142000" }
+                    ]
+                  },
+                  "notificationsArray": [
+                    {
+                      "curatedNotificationId": "\(curatedNotificationId)",
+                      "headline": "Welcome",
+                      "body": "Thanks for visiting",
+                      "type": "notification",
+                      "activation": "ON_ENTER",
+                      "published": true,
+                      "coolingPeriodSeconds": 3600,
+                      "maximumTriggers": 1
                     }
                   ]
                 }

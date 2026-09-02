@@ -490,14 +490,14 @@ public struct BubblFlushResult: Sendable, Codable, Equatable {
 }
 
 public struct BubblDiagnostics: Sendable, Codable, Equatable {
-    public var sdkVersion = "4.1.6"
+    public var sdkVersion = "4.1.7"
     public var platform = "ios"
     public var booted = false
     public var pendingIngestCount = 0
     public var pushTokenSuffix: String?
 
     public init(
-        sdkVersion: String = "4.1.6",
+        sdkVersion: String = "4.1.7",
         platform: String = "ios",
         booted: Bool = false,
         pendingIngestCount: Int = 0,
